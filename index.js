@@ -32,8 +32,6 @@ const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
   transports: [
-    new winston.transports.File({ filename: 'logs/security.log', level: 'warn' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
     new winston.transports.Console({ format: winston.format.simple() }),
   ],
 });
