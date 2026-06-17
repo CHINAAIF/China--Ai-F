@@ -1,47 +1,120 @@
-import dotenv from 'dotenv'; dotenv.config();
-import cron from 'node-cron';
-import { spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+dotenv.config();
+import pg from 'pg';
+import { checkAndAlert } from './agents/utils/alert-engine.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-function runScript(scriptPath) {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const child = spawn('node', [scriptPath], { env: process.env, stdio: 'pipe' });
-    let out = '', err = '';
-    child.stdout.on('data', d => out += d);
-    child.stderr.on('data', d => err += d);
-    child.on('close', code => {
-      const ms = Date.now() - start;
-      console.log(`[${new Date().toISOString()}] ${path.basename(scriptPath)} exit=${code} ms=${ms}`);
-      if (err) console.warn('stderr:', err.slice(0,200));
-      resolve({ code, out, err, ms });
-    });
-    child.on('error', e => { console.error('spawn_error:', e.message); resolve({ code:-1, err:e.message }); });
-  });
-}
-
-const SCRIPTS = [
-  path.join(__dirname, 'agents/intelligence/china-news-agent.js'),
-  path.join(__dirname, 'agents/governance/verification-agent.js'),
-  path.join(__dirname, 'agents/intelligence/pricing-tracker-agent.js'),
+// ── Pipeline تعريف ───────────────────────────────────────────────
+const PIPELINES = [
+  {
+    name: 'core-intelligence',
+    interval_ms: 6 * 60 * 60000,
+    agents: [
+      './agents/intelligence/china-news-agent.js',
+      './agents/governance/verification-agent.js',
+      './agents/intelligence/pricing-tracker-agent.js',
+    ]
+  },
+  {
+    name: 'analysis-pipeline',
+    interval_ms: 3 * 60 * 60000,
+    agents: [
+      './agents/analysis/trend-analysis-agent.js',
+      './agents/analysis/sentiment-agent.js',
+      './agents/analysis/risk-assessment-agent.js',
+      './agents/analysis/competitive-intel-agent.js',
+      './agents/analysis/market-signal-agent.js',
+    ]
+  },
+  {
+    name: 'learning-pipeline',
+    interval_ms: 4 * 60 * 60000,
+    agents: [
+      './agents/learning/pattern-learner-agent.js',
+      './agents/learning/feedback-agent.js',
+      './agents/learning/model-evaluator-agent.js',
+      './agents/learning/memory-consolidator-agent.js',
+    ]
+  },
+  {
+    name: 'service-pipeline',
+    interval_ms: 2 * 60 * 60000,
+    agents: [
+      './agents/service/market-data-agent.js',
+      './agents/service/currency-agent.js',
+      './agents/service/news-aggregator-agent.js',
+    ]
+  }
 ];
 
-async function runPipeline() {
-  console.log(`\n🔄 [${new Date().toISOString()}] Pipeline START`);
-  for (const s of SCRIPTS) {
-    try { await runScript(s); }
-    catch(e) { console.error(`❌ ${path.basename(s)}: ${e.message}`); }
+// ── تشغيل pipeline واحد بالتسلسل ────────────────────────────────
+async function runPipeline(pipeline) {
+  console.log(`\n🚀 Pipeline [${pipeline.name}] started — ${new Date().toISOString()}`);
+  const results = [];
+
+  for (const agentPath of pipeline.agents) {
+    try {
+      const mod = await import(agentPath);
+      const agent = mod.default || Object.values(mod)[0];
+      if (!agent) throw new Error('no_export');
+
+      const start = Date.now();
+      const result = await agent.run({});
+      const duration = Date.now() - start;
+
+      results.push({
+        agent: agentPath.split('/').pop(),
+        success: result?.success ?? false,
+        duration_ms: duration
+      });
+
+      await pool.query(`
+        INSERT INTO agent_execution_logs
+          (agent_name, action, input, output, confidence, status, duration_ms)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `, [
+        agentPath.split('/').pop().replace('.js',''),
+        `cron_${pipeline.name}`,
+        JSON.stringify({ pipeline: pipeline.name }),
+        JSON.stringify(result?.data || {}),
+        75,
+        result?.success ? 'completed' : 'failed',
+        duration
+      ]).catch(() => {});
+
+      console.log(`  ✅ ${agentPath.split('/').pop()} — ${duration}ms`);
+
+    } catch(e) {
+      results.push({ agent: agentPath.split('/').pop(), success: false, error: e.message });
+      console.warn(`  ⚠️  ${agentPath.split('/').pop()} — ${e.message}`);
+    }
   }
-  console.log(`✅ [${new Date().toISOString()}] Pipeline END\n`);
+
+  // alert check بعد كل pipeline
+  await checkAndAlert().catch(() => {});
+
+  const success = results.filter(r => r.success).length;
+  console.log(`✅ Pipeline [${pipeline.name}] done — ${success}/${results.length} succeeded`);
+  return results;
 }
 
-// كل 6 ساعات
-cron.schedule('0 */6 * * *', runPipeline, { timezone: 'Asia/Riyadh' });
+// ── جدولة كل pipeline ───────────────────────────────────────────
+async function start() {
+  console.log('⏱️  Cron Runner starting —', PIPELINES.length, 'pipelines');
 
-// تشغيل فوري عند البدء
-runPipeline();
+  for (const pipeline of PIPELINES) {
+    // تشغيل فوري
+    runPipeline(pipeline);
 
-console.log('⏰ cron-runner started — every 6h (Asia/Riyadh)');
+    // جدولة دورية
+    setInterval(() => runPipeline(pipeline), pipeline.interval_ms);
+
+    console.log(`  📌 [${pipeline.name}] every ${pipeline.interval_ms / 60000}min`);
+  }
+}
+
+start();
