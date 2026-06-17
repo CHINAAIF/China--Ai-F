@@ -11,3 +11,6 @@
 8. قبل كتابة أي INSERT: نفّذ فحص schema كامل للجدول (الأعمدة، NOT NULL، القيم الافتراضية) — لا تخمّن الأعمدة المطلوبة.
 9. لا تضع سلسلة خطوات INSERT متتابعة داخل try واحد — كل خطوة لها try/catch مستقل، بحيث فشل خطوة لا يوقف ما بعدها.
 10. اطبع رسالة الخطأ كاملة عند الفشل، لا تقصّها — التشخيص يحتاج النص الكامل.
+
+11. قبل أي INSERT في عمود به CHECK constraint (مثل brain_memory.memory_type): اجلب القيم المسموحة فعليًا عبر pg_constraint، ولا تدرج قيمة خام أبدًا — استخدم خريطة تحويل ثابتة.
+12. القيم المسموحة لـ brain_memory.memory_type: pricing_pattern, vendor_behavior, market_signal, content_insight, agent_performance, security_pattern, user_behavior, prediction_result.
