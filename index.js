@@ -135,9 +135,8 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 
 process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
-const PORT = process.env.PORT || 5000;
 
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-    console.log(`✅ Sovereign Kernel Active on port ${PORT}`);
+const SERVER_PORT = process.env.PORT || 5000;
+app.listen(SERVER_PORT, () => {
+    console.log(`✅ Sovereign Kernel Active on port ${SERVER_PORT}`);
 });

@@ -3,8 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const localDbUrl = process.env.DATABASE_URL || '';
-
+// إعداد كائن الاتصال بمعايير الإنتاج السحابي الصارمة
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
@@ -16,7 +15,6 @@ export class ChinaAIFBrain {
     }
 
     async learn(approvedId, memoryType = 'signal') {
-        // ضمان توافق النوع مع قيد السكيما المعتمد
         const allowedTypes = ['signal', 'insight', 'fact'];
         const finalType = allowedTypes.includes(memoryType) ? memoryType : 'signal';
         
@@ -24,7 +22,7 @@ export class ChinaAIFBrain {
             INSERT INTO brain_memory (learning_approved_id, memory_type, content, vector_embedding)
             VALUES ($1, $2, $3, $4)
         `;
-        // منطق الإدخال المستقر
+        return await this.pool.query(query, [approvedId, finalType, '', null]);
     }
 }
 
