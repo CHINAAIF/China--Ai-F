@@ -325,3 +325,58 @@ app.get('/health', async (req, res) => {
 });
 
 app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
+
+// ── Judicial Intelligence Dashboard ─────────────────────────────
+app.get('/api/judicial/stats', async (req, res) => {
+  try {
+    const [cache, routing, firewall, distill] = await Promise.all([
+      pool.query(`
+        SELECT COUNT(*) as total,
+               SUM(usage_count) as total_hits,
+               ROUND(AVG(confidence)) as avg_confidence,
+               COUNT(*) FILTER (WHERE is_permanent=null OR verified=true) as verified
+        FROM sovereign_memory_local
+      `),
+      pool.query(`
+        SELECT decision, COUNT(*) as count,
+               ROUND(AVG(latency_ms)) as avg_latency_ms
+        FROM judicial_routing_log
+        WHERE created_at > NOW() - INTERVAL '24 hours'
+        GROUP BY decision ORDER BY count DESC
+      `),
+      pool.query(`
+        SELECT blocked, COUNT(*) as count,
+               threat_type
+        FROM security_filter_log
+        WHERE created_at > NOW() - INTERVAL '24 hours'
+        GROUP BY blocked, threat_type ORDER BY count DESC
+      `),
+      pool.query(`
+        SELECT COUNT(*) as rules,
+               COUNT(*) FILTER (WHERE is_permanent=true) as permanent,
+               ROUND(AVG(confidence)) as avg_confidence
+        FROM knowledge_distillation
+      `)
+    ]);
+
+    const cacheHits    = routing.rows.find(r => r.decision === 'cache_hit');
+    const totalRouted  = routing.rows.reduce((s, r) => s + parseInt(r.count), 0);
+    const hitRate      = totalRouted > 0 && cacheHits
+      ? ((parseInt(cacheHits.count) / totalRouted) * 100).toFixed(1)
+      : '0.0';
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      sovereign_memory: {
+        ...cache.rows[0],
+        cache_hit_rate_24h: `${hitRate}%`
+      },
+      routing_24h:   routing.rows,
+      security_24h:  firewall.rows,
+      distillation:  distill.rows[0],
+      system_status: 'judicial_layer_active'
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
