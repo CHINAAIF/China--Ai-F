@@ -281,3 +281,4 @@ app.get('/api/sovereign/dashboard', async (req, res) => {
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
 const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
+import './agents/worker-scheduler.js';
