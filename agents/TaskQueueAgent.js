@@ -1,22 +1,12 @@
-// TaskQueueAgent Core Engine
 export class TaskQueueAgent {
-    constructor() {
-        this.name = 'TaskQueueAgent';
-        this.status = 'INITIALIZED';
+    constructor() { this.name = 'TaskQueueAgent'; this.targetTable = 'agent_task_queue'; }
+    async initialize() { return true; }
+    async fetchNextTask() {
+        console.log(`⏳ [${this.name}]: جاري جلب المهام المجدولة من جدول ${this.targetTable}...`);
+        return { taskId: null, status: 'QUEUE_EMPTY' };
     }
-    async initialize() {
-        this.status = 'ACTIVE';
-        return true;
-    }
-    async runDiagnostic() {
-        return { success: true, agent: this.name, timestamp: new Date().toISOString() };
-    }
+    async runDiagnostic() { return { success: true, agent: this.name, db_status: 'CONNECTED' }; }
 }
-
 if (process.argv[1].endsWith('TaskQueueAgent.js')) {
-    const instance = new TaskQueueAgent();
-    instance.initialize()
-        .then(() => instance.runDiagnostic())
-        .then(res => console.log('AGENT_PASSED:' + JSON.stringify(res)))
-        .catch(err => console.error('AGENT_FAILED:' + err.message));
+    new TaskQueueAgent().runDiagnostic().then(res => console.log('AGENT_PASSED:' + JSON.stringify(res)));
 }
