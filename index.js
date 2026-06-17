@@ -129,6 +129,74 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
+
+app.post('/api/brain/think', async (req, res) => {
+  const { query, context, priority = 5 } = req.body;
+  if (!query) return res.status(422).json({ error: 'query required' });
+  try {
+    await pool.query('INSERT INTO agent_task_queue (agent_name, task_type, priority, payload, status) VALUES ($1,$2,$3,$4,$5)',
+      ['master_orchestrator', 'brain_query', priority, JSON.stringify({ query, context }), 'pending']);
+    const memory = await pool.query('SELECT * FROM brain_long_memory WHERE memory_type=$1 ORDER BY importance DESC LIMIT 5', ['strategic']);
+    const result = await runAIQuery({ messages: [{ role: 'user', content: query }], resource: 'models' });
+    await pool.query('INSERT INTO brain_long_memory (memory_type, key, value, importance) VALUES ($1,$2,$3,$4) ON CONFLICT (memory_type,key) DO UPDATE SET value=$3, updated_at=NOW()',
+      ['strategic', query.substring(0,50), JSON.stringify({ query, answer: result.content, timestamp: new Date() }), priority]);
+    res.json({ answer: result.content, memory_context: memory.rows, model: result.model, correlationId: req.correlationId });
+  } catch(err) { res.status(500).json({ error: err.message, correlationId: req.correlationId }); }
+});
+
+app.get('/api/agents/health', async (req, res) => {
+  try {
+    const [registry, heartbeat, circuit, queue] = await Promise.all([
+      pool.query('SELECT agent_layer, COUNT(*) as count, COUNT(CASE WHEN status=$1 THEN 1 END) as active FROM agent_registry GROUP BY agent_layer', ['active']),
+      pool.query('SELECT agent_name, status, last_ping, missed_pings FROM agent_heartbeat ORDER BY last_ping DESC LIMIT 20'),
+      pool.query('SELECT agent_name, state, failure_count FROM agent_circuit_breaker WHERE state != $1', ['closed']),
+      pool.query('SELECT status, COUNT(*) as count FROM agent_task_queue GROUP BY status'),
+    ]);
+    res.json({ registry: registry.rows, heartbeat: heartbeat.rows, circuit_breakers: circuit.rows, queue_stats: queue.rows, correlationId: req.correlationId });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/tasks/queue', async (req, res) => {
+  const { agent_name, task_type, priority = 5, payload } = req.body;
+  if (!agent_name || !task_type) return res.status(422).json({ error: 'agent_name and task_type required' });
+  try {
+    const circuit = await pool.query('SELECT state FROM agent_circuit_breaker WHERE agent_name=$1', [agent_name]);
+    if (circuit.rows[0]?.state === 'open') return res.status(503).json({ error: 'Agent circuit breaker OPEN — agent temporarily disabled' });
+    const result = await pool.query('INSERT INTO agent_task_queue (agent_name, task_type, priority, payload) VALUES ($1,$2,$3,$4) RETURNING id, created_at',
+      [agent_name, task_type, Math.min(Math.max(priority,1),10), JSON.stringify(payload)]);
+    res.status(201).json({ task_id: result.rows[0].id, status: 'queued', priority, correlationId: req.correlationId });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/agents/heartbeat', async (req, res) => {
+  const { agent_name, metadata } = req.body;
+  if (!agent_name) return res.status(422).json({ error: 'agent_name required' });
+  try {
+    await pool.query('INSERT INTO agent_heartbeat (agent_name, status, last_ping, metadata) VALUES ($1,$2,NOW(),$3) ON CONFLICT DO NOTHING',
+      [agent_name, 'alive', JSON.stringify(metadata)]);
+    await pool.query('UPDATE agent_heartbeat SET status=$1, last_ping=NOW(), missed_pings=0, metadata=$2 WHERE agent_name=$3',
+      ['alive', JSON.stringify(metadata), agent_name]);
+    res.json({ status: 'ok', agent: agent_name, timestamp: new Date().toISOString() });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/brain/memory', async (req, res) => {
+  const { type = 'strategic', limit = 20 } = req.query;
+  try {
+    const result = await pool.query('SELECT * FROM brain_long_memory WHERE memory_type=$1 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY importance DESC, updated_at DESC LIMIT $2',
+      [type, Math.min(limit,100)]);
+    res.json({ memories: result.rows, count: result.rows.length, correlationId: req.correlationId });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/tasks/queue', async (req, res) => {
+  const { status = 'pending', limit = 50 } = req.query;
+  try {
+    const result = await pool.query('SELECT * FROM agent_task_queue WHERE status=$1 ORDER BY priority DESC, created_at ASC LIMIT $2', [status, limit]);
+    res.json({ tasks: result.rows, count: result.rows.length, correlationId: req.correlationId });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 app.use((err, req, res, next) => { logger.error('Unhandled', { error: err.message }); res.status(500).json({ error: 'Internal Error', correlationId: req.correlationId }); });
 app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 
@@ -136,7 +204,4 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
-const CLOUD_PORT = process.env.PORT || 5000;
-app.listen(CLOUD_PORT, () => {
-    console.log(`✅ Sovereign Kernel Active on port ${CLOUD_PORT}`);
-});
+const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
