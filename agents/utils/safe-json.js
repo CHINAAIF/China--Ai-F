@@ -1,19 +1,85 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import Groq from 'groq-sdk';
+import pg from 'pg';
+import crypto from 'crypto';
 import { semanticFirewall } from './semantic-firewall.js';
 import { distill } from './knowledge-distiller.js';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const MODELS = [
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// ── نماذج مصنّفة بالدقة ─────────────────────────────────────────
+const MODEL_MATRIX = {
+  financial:  { model: 'llama-3.3-70b-versatile',  temp: 0.2 },
+  strategic:  { model: 'llama-3.3-70b-versatile',  temp: 0.2 },
+  analysis:   { model: 'llama-3.3-70b-versatile',  temp: 0.3 },
+  sovereign:  { model: 'llama-3.3-70b-versatile',  temp: 0.1 },
+  classify:   { model: 'llama-3.1-8b-instant',     temp: 0.1 },
+  filter:     { model: 'llama-3.1-8b-instant',     temp: 0.1 },
+  summary:    { model: 'llama-3.1-8b-instant',     temp: 0.2 },
+  default:    { model: 'llama-3.3-70b-versatile',  temp: 0.3 },
+};
+
+const FALLBACK_CHAIN = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
   'gemma2-9b-it',
 ];
 
+function detectTask(prompt) {
+  const p = prompt.toLowerCase();
+  if (p.includes('financ') || p.includes('invest') || p.includes('revenue'))  return 'financial';
+  if (p.includes('strateg') || p.includes('decision') || p.includes('plan'))  return 'strategic';
+  if (p.includes('analyz') || p.includes('trend') || p.includes('signal'))    return 'analysis';
+  if (p.includes('sovereign') || p.includes('veto') || p.includes('govern'))  return 'sovereign';
+  if (p.includes('classif') || p.includes('sort') || p.includes('categ'))     return 'classify';
+  if (p.includes('summar') || p.includes('digest') || p.includes('brief'))    return 'summary';
+  return 'default';
+}
+
+function hashQuery(text) {
+  return crypto.createHash('sha256').update(text.trim().toLowerCase()).digest('hex').slice(0, 64);
+}
+
+async function checkCache(hash) {
+  try {
+    const { rows } = await pool.query(`
+      SELECT response_data, confidence FROM sovereign_memory_local
+      WHERE query_hash=$1 AND verified=true AND confidence>=80
+      LIMIT 1
+    `, [hash]);
+    if (rows.length > 0) {
+      await pool.query(`
+        UPDATE sovereign_memory_local
+        SET usage_count=usage_count+1, last_used=NOW()
+        WHERE query_hash=$1
+      `, [hash]).catch(()=>{});
+      return rows[0];
+    }
+  } catch(_) {}
+  return null;
+}
+
+async function logRouting(agentName, hash, decision, model, cacheHit, latency) {
+  try {
+    await pool.query(`
+      INSERT INTO judicial_routing_log
+        (agent_name,query_hash,decision,model_selected,cache_hit,latency_ms)
+      VALUES ($1,$2,$3,$4,$5,$6)
+    `, [agentName, hash, decision, model, cacheHit, latency]);
+  } catch(_) {}
+}
+
 export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') {
-  // ── Semantic Firewall على الـprompt ─────────────────────
+  const start = Date.now();
+  const hash  = hashQuery(prompt);
+
+  // ── 1. Semantic Firewall ─────────────────────────────────
   try {
     const check = await semanticFirewall(prompt, agentName);
     if (!check.allowed) {
@@ -21,25 +87,39 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
     }
   } catch(_) {}
 
-  const targetModel = model || MODELS[0];
-  let lastError = null;
+  // ── 2. Cache Check — صفر تكلفة ──────────────────────────
+  const cached = await checkCache(hash);
+  if (cached) {
+    await logRouting(agentName, hash, 'cache_hit', 'local', true, Date.now()-start);
+    return { success: true, data: cached.response_data, cached: true, model: 'local' };
+  }
 
-  for (const m of [targetModel, ...MODELS.filter(x => x !== targetModel)]) {
+  // ── 3. Judicial Routing — النموذج الأنسب ────────────────
+  const taskType  = detectTask(prompt);
+  const { model: routedModel, temp } = MODEL_MATRIX[taskType];
+  const target    = model || routedModel;
+  const chain     = [target, ...FALLBACK_CHAIN.filter(m => m !== target)];
+
+  await logRouting(agentName, hash, `routed:${taskType}`, target, false, 0);
+
+  // ── 4. Execution مع Fallback chain ──────────────────────
+  let lastError = null;
+  for (const m of chain) {
     try {
       const res = await groq.chat.completions.create({
         model: m,
         messages: [
           {
             role: 'system',
-            content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation.'
+            content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.'
           },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.3,
+        temperature: temp,
         max_tokens: 1000,
       });
 
-      const raw = res.choices?.[0]?.message?.content || '';
+      const raw   = res.choices?.[0]?.message?.content || '';
       const clean = raw.replace(/```json|```/g, '').trim();
 
       let parsed;
@@ -47,18 +127,21 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
         parsed = JSON.parse(clean);
       } catch(_) {
         const match = clean.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('no_json');
+        if (!match) throw new Error('no_json_in_response');
         parsed = JSON.parse(match[0]);
       }
 
       const confidence = Math.min(100, Math.max(0, Math.round(parsed?.confidence ?? 75)));
+      const latency    = Date.now() - start;
 
-      // ── Knowledge Distiller على كل نجاح ─────────────────
+      await logRouting(agentName, hash, 'executed', m, false, latency);
+
+      // ── 5. Knowledge Distillation — حفر القرارات الناجحة ─
       if (confidence >= 80) {
         distill(agentName, prompt, parsed, confidence).catch(() => {});
       }
 
-      return { success: true, data: parsed, model: m, error: null };
+      return { success: true, data: parsed, model: m, cached: false, latency_ms: latency };
 
     } catch(e) {
       lastError = e.message;
