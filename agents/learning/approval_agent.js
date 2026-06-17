@@ -1,47 +1,30 @@
-/**
- * Sovereign Agent Code Core - Autonomous Spec
- * Agent: approval_agent | Layer: learning
- */
-import dotenv from 'dotenv';
-dotenv.config();
+import dotenv from 'dotenv'; dotenv.config();
+import pg from 'pg';
+import { safeGroqJSON } from '../utils/safe-json.js';
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 
 class ApprovalAgent {
-    constructor() {
-        this.name = 'approval_agent';
-        this.layer = 'learning';
-        this.status = 'active';
-    }
-
-    async initialize() {
-        // اللمسة السحرية: الفحص الآتي والبدائل التلقائية في حالة انقطاع الاتصال
-        try {
-            return true;
-        } catch (e) {
-            this.status = 'fallback';
-            return false;
-        }
-    }
-
-    async runDiagnostic() {
-        return {
-            success: true,
-            agent: this.name,
-            layer: this.layer,
-            status: this.status,
-            timestamp: new Date().toISOString()
-        };
-    }
+  constructor() { this.name = 'approval_agent'; this.layer = 'learning'; this.status = 'active'; }
+  async initialize() {
+    try { await pool.query('SELECT 1'); return true; }
+    catch(e) { this.status = 'db_error'; return false; }
+  }
+  async run(input = {}) {
+    try {
+      const result = await safeGroqJSON(`أنت وكيل موافقة على بيانات التعلم. راجع البيانات المقترحة وقرر الموافقة أو الرفض بناءً على الجودة والدقة والأهمية لمنصة استخبارات AI. البيانات: ${JSON.stringify(input)}. أجب بـ JSON: {approved:boolean,final_confidence:number,knowledge_extracted:{key_insights:array,patterns:array},reason:string}`);
+      if (!result.data) return { success: false, error: result.error };
+      try {
+        await pool.query(
+          `INSERT INTO agent_execution_logs (agent_name,action,input,output,confidence,status) VALUES ($1,'approve',$2,$3,$4,'completed')`,
+          [this.name, JSON.stringify(input), JSON.stringify(result.data), Math.min(100,Math.max(0,Math.round(result.data.final_confidence||75)))]
+        );
+      } catch(e) { console.warn('⚠️ log_fail:', e.message); }
+      return { success: true, data: result.data };
+    } catch(e) { return { success: false, error: e.message }; }
+  }
+  async runDiagnostic() { const r = await this.run({test:true,candidate:'sample approval'}); return { agent: this.name, status: r.success?'ok':'error', ...r }; }
 }
 
-if (process.argv[1] && process.argv[1].endsWith('approval_agent.js')) {
-    const instance = new ApprovalAgent();
-    instance.initialize().then(() => {
-        return instance.runDiagnostic();
-    }).then(res => {
-        console.log('AGENT_PASSED');
-    }).catch(err => {
-        console.error('AGENT_FAILED: ' + err.message);
-    });
-}
-
-export default ApprovalAgent;
+export const approvalAgent = new ApprovalAgent();
+export default approvalAgent;
