@@ -1,47 +1,44 @@
 /**
- * Sovereign Agent Code Core - Autonomous Spec
- * Agent: china_patent_agent | Layer: intelligence
+ * china_patent_agent | layer: intelligence
+ * منطق Groq حقيقي — يستخدم safe-json.js
  */
-import dotenv from 'dotenv';
-dotenv.config();
+import dotenv from 'dotenv'; dotenv.config();
+import pg from 'pg';
+import { safeGroqJSON } from '../utils/safe-json.js';
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 
 class ChinaPatentAgent {
-    constructor() {
-        this.name = 'china_patent_agent';
-        this.layer = 'intelligence';
-        this.status = 'active';
-    }
+  constructor() {
+    this.name = 'china_patent_agent';
+    this.layer = 'intelligence';
+    this.status = 'active';
+  }
 
-    async initialize() {
-        // اللمسة السحرية: الفحص الآتي والبدائل التلقائية في حالة انقطاع الاتصال
-        try {
-            return true;
-        } catch (e) {
-            this.status = 'fallback';
-            return false;
-        }
-    }
+  async initialize() {
+    try { await pool.query('SELECT 1'); return true; }
+    catch(e) { this.status = 'db_error'; return false; }
+  }
 
-    async runDiagnostic() {
-        return {
-            success: true,
-            agent: this.name,
-            layer: this.layer,
-            status: this.status,
-            timestamp: new Date().toISOString()
-        };
-    }
+  async run(input = {}) {
+    const prompt = `Track Chinese AI patents: filing trends, key assignees, technology areas, global comparison.\n\nInput: ${JSON.stringify(input)}\n\nRespond ONLY with JSON: {"patents":[{"title":"...","assignee":"...","tech_area":"...","significance":"high|medium|low"}],"filing_trend":"up|down|stable","confidence":85}`;
+    const result = await safeGroqJSON(prompt);
+    if (!result.data) return { success: false, error: result.error, raw: result.raw };
+    try {
+      await pool.query(
+        `INSERT INTO agent_execution_logs (agent_name, action, input, output, confidence, status)
+         VALUES ($1,'analyze',$2,$3,$4,'completed')`,
+        [this.name, JSON.stringify(input), JSON.stringify(result.data), Math.round(result.data.confidence||75)]
+      );
+    } catch(e) { console.warn('⚠️ log_fail (متابعة):', e.message); }
+    return { success: true, data: result.data, retried: result.retried };
+  }
+
+  async runDiagnostic() {
+    const r = await this.run({ test: true });
+    return { agent: this.name, layer: this.layer, status: r.success?'ok':'error', ...r };
+  }
 }
 
-if (process.argv[1] && process.argv[1].endsWith('china_patent_agent.js')) {
-    const instance = new ChinaPatentAgent();
-    instance.initialize().then(() => {
-        return instance.runDiagnostic();
-    }).then(res => {
-        console.log('AGENT_PASSED');
-    }).catch(err => {
-        console.error('AGENT_FAILED: ' + err.message);
-    });
-}
-
-export default ChinaPatentAgent;
+export const chinaPatentAgent = new ChinaPatentAgent();
+export default chinaPatentAgent;
