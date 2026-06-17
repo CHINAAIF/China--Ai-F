@@ -1,5 +1,6 @@
 // Agent 1: RegistryAgent - Autonomous Production Engine
 import process from 'process';
+import { logExecution, safeStep, tableExists } from '../../utils/executor.js';
 
 export class RegistryAgent {
     constructor() {

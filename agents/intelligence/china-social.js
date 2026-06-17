@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { brain } from '../brain.js';
+import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 dotenv.config();
 
 const { Pool } = pg;

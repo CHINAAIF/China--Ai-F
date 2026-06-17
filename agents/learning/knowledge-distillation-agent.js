@@ -3,6 +3,7 @@ dotenv.config();
 import pg from 'pg';
 import { distill } from '../utils/knowledge-distiller.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,

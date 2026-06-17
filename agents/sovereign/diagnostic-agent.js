@@ -2,6 +2,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import { createHmac } from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 const HMAC_SECRET = process.env.ENCRYPTION_KEY || 'sovereign-default-key';

@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 dotenv.config();
 
 const { Pool } = pg;
