@@ -8,6 +8,7 @@
     "cron": "node cron-runner.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
     "better-auth": "^1.6.19",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
