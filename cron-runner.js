@@ -8,7 +8,6 @@ const pool = new pg.Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// ── Pipeline تعريف ───────────────────────────────────────────────
 const PIPELINES = [
   {
     name: 'core-intelligence',
@@ -23,38 +22,70 @@ const PIPELINES = [
     name: 'analysis-pipeline',
     interval_ms: 3 * 60 * 60000,
     agents: [
-      './agents/analysis/trend-analysis-agent.js',
-      './agents/analysis/sentiment-agent.js',
-      './agents/analysis/risk-assessment-agent.js',
-      './agents/analysis/competitive-intel-agent.js',
-      './agents/analysis/market-signal-agent.js',
+      './agents/analysis/trend_prediction_agent.js',
+      './agents/analysis/sentiment_analysis_agent.js',
+      './agents/analysis/price_prediction_agent.js',
+      './agents/analysis/competitor_analysis_agent.js',
+      './agents/analysis/fact_checker_agent.js',
     ]
   },
   {
     name: 'learning-pipeline',
     interval_ms: 4 * 60 * 60000,
     agents: [
-      './agents/learning/pattern-learner-agent.js',
-      './agents/learning/feedback-agent.js',
-      './agents/learning/model-evaluator-agent.js',
-      './agents/learning/memory-consolidator-agent.js',
+      './agents/learning/learning_agent.js',
+      './agents/learning/filter_agent.js',
+      './agents/learning/approval_agent.js',
+      './agents/learning/verification_agent.js',
     ]
   },
   {
     name: 'service-pipeline',
     interval_ms: 2 * 60 * 60000,
     agents: [
-      './agents/service/market-data-agent.js',
-      './agents/service/currency-agent.js',
-      './agents/service/news-aggregator-agent.js',
+      './agents/service/platform_health_agent.js',
+      './agents/service/api_monitor_agent.js',
+      './agents/service/db_guardian_agent.js',
+      './agents/service/performance_agent.js',
+      './agents/service/error_recovery_agent.js',
+    ]
+  },
+  {
+    name: 'intelligence-pipeline',
+    interval_ms: 5 * 60 * 60000,
+    agents: [
+      './agents/intelligence/china_policy_agent.js',
+      './agents/intelligence/china_company_agent.js',
+      './agents/intelligence/china_investment_agent.js',
+      './agents/intelligence/global_comparison_agent.js',
+      './agents/intelligence/supply_chain_agent.js',
+    ]
+  },
+  {
+    name: 'security-pipeline',
+    interval_ms: 8 * 60 * 60000,
+    agents: [
+      './agents/security/threat_monitor_agent.js',
+      './agents/security/fraud_detection_agent.js',
+      './agents/security/compliance_agent.js',
+      './agents/security/cyber_defense_agent.js',
+    ]
+  },
+  {
+    name: 'content-pipeline',
+    interval_ms: 12 * 60 * 60000,
+    agents: [
+      './agents/content/content_writer_agent.js',
+      './agents/content/seo_agent.js',
+      './agents/content/editorial_agent.js',
+      './agents/content/summary_agent.js',
     ]
   }
 ];
 
-// ── تشغيل pipeline واحد بالتسلسل ────────────────────────────────
 async function runPipeline(pipeline) {
-  console.log(`\n🚀 Pipeline [${pipeline.name}] started — ${new Date().toISOString()}`);
-  const results = [];
+  console.log(`\n🚀 [${pipeline.name}] started — ${new Date().toISOString()}`);
+  let success = 0;
 
   for (const agentPath of pipeline.agents) {
     try {
@@ -66,11 +97,7 @@ async function runPipeline(pipeline) {
       const result = await agent.run({});
       const duration = Date.now() - start;
 
-      results.push({
-        agent: agentPath.split('/').pop(),
-        success: result?.success ?? false,
-        duration_ms: duration
-      });
+      if (result?.success) success++;
 
       await pool.query(`
         INSERT INTO agent_execution_logs
@@ -87,33 +114,21 @@ async function runPipeline(pipeline) {
       ]).catch(() => {});
 
       console.log(`  ✅ ${agentPath.split('/').pop()} — ${duration}ms`);
-
     } catch(e) {
-      results.push({ agent: agentPath.split('/').pop(), success: false, error: e.message });
       console.warn(`  ⚠️  ${agentPath.split('/').pop()} — ${e.message}`);
     }
   }
 
-  // alert check بعد كل pipeline
   await checkAndAlert().catch(() => {});
-
-  const success = results.filter(r => r.success).length;
-  console.log(`✅ Pipeline [${pipeline.name}] done — ${success}/${results.length} succeeded`);
-  return results;
+  console.log(`✅ [${pipeline.name}] done — ${success}/${pipeline.agents.length}`);
 }
 
-// ── جدولة كل pipeline ───────────────────────────────────────────
 async function start() {
-  console.log('⏱️  Cron Runner starting —', PIPELINES.length, 'pipelines');
-
+  console.log('⏱️  Cron Runner — ', PIPELINES.length, 'pipelines');
   for (const pipeline of PIPELINES) {
-    // تشغيل فوري
     runPipeline(pipeline);
-
-    // جدولة دورية
     setInterval(() => runPipeline(pipeline), pipeline.interval_ms);
-
-    console.log(`  📌 [${pipeline.name}] every ${pipeline.interval_ms / 60000}min`);
+    console.log(`  📌 [${pipeline.name}] every ${pipeline.interval_ms/60000}min`);
   }
 }
 
