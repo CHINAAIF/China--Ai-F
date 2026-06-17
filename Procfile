@@ -1,1 +1,1 @@
-web: node index.js
+web: node railway-env-check.js
