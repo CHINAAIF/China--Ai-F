@@ -43,3 +43,6 @@ if (process.argv[1] && process.argv[1].endsWith('RegistryAgent.js')) {
         .then(res => console.log('AGENT_PASSED:' + JSON.stringify(res)))
         .catch(err => console.error('AGENT_FAILED:' + err.message));
 }
+
+export const instance = new RegistryAgent();
+export default instance;

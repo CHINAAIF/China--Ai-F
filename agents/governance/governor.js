@@ -106,5 +106,6 @@ export class GovernanceLayer {
   }
 }
 
+
 export const governor = new GovernanceLayer();
 export default governor;

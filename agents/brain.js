@@ -25,4 +25,7 @@ export class ChinaAIFBrain {
     }
 }
 
-export default new ChinaAIFBrain();
+
+
+export const brain = new ChinaAIFBrain();
+export default brain;
