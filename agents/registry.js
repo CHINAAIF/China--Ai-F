@@ -1,10 +1,15 @@
-// مُولَّد تلقائيًا - مُحمِّل عام لكل الوكلاء (108 ملف)
+// مُولَّد تلقائيًا - مُحمِّل عام للوكلاء (singleton فقط - يستثني سكربتات standalone)
 import { promises as fs } from 'fs';
 import path from 'path';
-import { pathToFileURL } from 'url';
-import { fileURLToPath } from 'url';
+import { pathToFileURL, fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const STANDALONE_SCRIPTS = [
+  'intelligence/china-news-agent.js',
+  'intelligence/pricing-tracker-agent.js',
+  'governance/verification-agent.js'
+];
 
 async function walk(dir, out=[]) {
   for (const e of await fs.readdir(dir, {withFileTypes:true})) {
@@ -17,7 +22,8 @@ async function walk(dir, out=[]) {
 }
 
 export async function loadAllAgents() {
-  const files = await walk(__dirname);
+  const all = await walk(__dirname);
+  const files = all.filter(f => !STANDALONE_SCRIPTS.includes(path.relative(__dirname, f)));
   const loaded = []; const failed = [];
   for (const f of files) {
     try {
@@ -28,5 +34,5 @@ export async function loadAllAgents() {
       loaded.push({ name: instance.name || path.basename(f,'.js'), layer: instance.layer || 'unknown', instance });
     } catch(e) { failed.push({file:f, reason:e.message}); }
   }
-  return { loaded, failed };
+  return { loaded, failed, skipped: STANDALONE_SCRIPTS };
 }

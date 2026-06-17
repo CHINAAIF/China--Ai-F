@@ -8,6 +8,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 async function run() {
   console.log('💰 Pricing Tracker Agent Starting...');
   await pool.query(`UPDATE agent_registry SET status='running', last_run=NOW() WHERE agent_name='pricing_tracker_agent'`).catch(() => {});
+  await pool.query(`INSERT INTO agent_heartbeat (agent_name, status, last_ping) VALUES ('pricing_tracker_agent','alive',NOW()) ON CONFLICT (agent_name) DO UPDATE SET status='alive', last_ping=NOW()`).catch(() => {});
 
   const models = [
     { name: 'DeepSeek-V3', vendor: 'DeepSeek' },
