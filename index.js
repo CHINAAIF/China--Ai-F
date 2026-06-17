@@ -202,6 +202,55 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 
 
 process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
+
+// ═══ SOVEREIGN MIND API ═══
+import sovereignMind from './agents/sovereign/sovereign-mind.js';
+import executiveAgent from './agents/sovereign/executive-agent.js';
+import qualityGateAgent from './agents/sovereign/quality-gate-agent.js';
+import diagnosticAgent from './agents/sovereign/diagnostic-agent.js';
+
+app.post('/api/sovereign/think', async (req, res) => {
+  try {
+    const { input, context } = req.body;
+    if(!input) return res.status(400).json({error:'input required'});
+    const r = await sovereignMind.think(input, context||{});
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/sovereign/execute', async (req, res) => {
+  try {
+    const { operation_id, command_type, payload } = req.body;
+    if(!command_type||!payload) return res.status(400).json({error:'command_type and payload required'});
+    const r = await executiveAgent.prepareCommand(operation_id||null, command_type, payload);
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/sovereign/review/:commandId', async (req, res) => {
+  try {
+    const r = await qualityGateAgent.review(req.params.commandId);
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/sovereign/diagnostic', async (req, res) => {
+  try {
+    const r = await diagnosticAgent.scan();
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/sovereign/status', async (req, res) => {
+  try {
+    const [ops, models] = await Promise.all([
+      pool.query('SELECT COUNT(*),status FROM sovereign_operations GROUP BY status'),
+      pool.query('SELECT COUNT(*) FROM model_registry_sovereign WHERE is_active=true')
+    ]);
+    res.json({ agents:108, sovereign_operations: ops.rows, active_models: parseInt(models.rows[0].count), status:'operational' });
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
 const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
