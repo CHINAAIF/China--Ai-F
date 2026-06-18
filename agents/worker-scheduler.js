@@ -1,35 +1,35 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import { config } from 'dotenv';
+config();
 import { pool } from './utils/db.js';
 
-// ── جدول الأولويات ──────────────────────────────────────────────
+// ── جدول الأولويات — مسارات مؤكَّدة الوجود فعلياً ──────────────
 const SCHEDULE = [
   // [agent_path, interval_ms, priority]
-  ['./service/market-data-agent.js',        5  * 60000, 1],
-  ['./service/news-aggregator-agent.js',    5  * 60000, 1],
-  ['./service/currency-agent.js',           5  * 60000, 1],
-  ['./analysis/trend-analysis-agent.js',   10  * 60000, 2],
-  ['./analysis/sentiment-agent.js',        10  * 60000, 2],
-  ['./analysis/risk-assessment-agent.js',  15  * 60000, 2],
-  ['./learning/pattern-learner-agent.js',  20  * 60000, 3],
-  ['./learning/feedback-agent.js',         30  * 60000, 3],
+  ['./intelligence/china_investment_agent.js',   5  * 60000, 1],
+  ['./intelligence/global_models_agent.js',      5  * 60000, 1],
+  ['./intelligence/china_company_agent.js',      5  * 60000, 1],
+  ['./analysis/trend_prediction_agent.js',      10  * 60000, 2],
+  ['./analysis/sentiment_analysis_agent.js',    10  * 60000, 2],
+  ['./analysis/model-benchmarking-engine.js',   30  * 60000, 2],
+  ['./learning/learning_agent.js',              20  * 60000, 3],
+  ['./learning/approval_agent.js',              30  * 60000, 3],
 ];
 
-const timers   = new Map();
-const stats    = new Map();
-let   deadCount   = 0;
-let   failedCount = 0;
+const stats = new Map();
 
 // ── تشغيل وكيل واحد بأمان ───────────────────────────────────────
 async function runAgent(agentPath, priority) {
   const key = agentPath;
   if (!stats.has(key)) stats.set(key, { runs: 0, fails: 0, last: null });
   const s = stats.get(key);
+  const agentName = agentPath.split('/').pop().replace('.js', '');
 
   try {
     const mod = await import(agentPath);
     const agent = mod.default || Object.values(mod)[0];
-    if (!agent) throw new Error('no_export');
+    if (!agent || typeof agent.run !== 'function') {
+      throw new Error('no_run_export');
+    }
 
     const result = await agent.run({});
     s.runs++;
@@ -37,8 +37,7 @@ async function runAgent(agentPath, priority) {
 
     if (!result?.success) {
       s.fails++;
-      failedCount++;
-      await logDiagnostic(agentPath, 'failed', result?.error || 'unknown');
+      await logDiagnostic(agentName, 'failed', result?.error || 'unknown');
     }
 
     await pool.query(
@@ -46,105 +45,169 @@ async function runAgent(agentPath, priority) {
          (agent_name, action, input, output, confidence, status)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [
-        agentPath.split('/').pop().replace('.js',''),
+        agentName,
         'scheduled_run',
         JSON.stringify({ priority }),
         JSON.stringify(result?.data || {}),
         75,
         result?.success ? 'completed' : 'failed'
       ]
-    ).catch(() => {});
+    ).catch(e => console.warn('⚠️ log_fail:', e.message));
 
   } catch(e) {
     s.fails++;
-    failedCount++;
-    await logDiagnostic(agentPath, 'crash', e.message);
+    await logDiagnostic(agentName, 'crash', e.message);
+    console.error(`❌ ${agentName}: ${e.message}`);
+  }
+}
+
+// ── consumer حقيقي لـagent_task_queue ───────────────────────────
+async function processQueue() {
+  try {
+    // اسحب مهمة pending بالأولوية + قفل لتجنب التعارض
+    const { rows } = await pool.query(`
+      UPDATE agent_task_queue
+      SET status='running', started_at=NOW(), attempts=attempts+1
+      WHERE id = (
+        SELECT id FROM agent_task_queue
+        WHERE status='pending'
+          AND (scheduled_at IS NULL OR scheduled_at <= NOW())
+          AND attempts < max_attempts
+        ORDER BY priority DESC, created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *
+    `);
+
+    if (!rows.length) return; // لا مهام
+
+    const task = rows[0];
+    const agentName = task.agent_name;
+    const payload   = task.payload || {};
+
+    console.log(`📋 task: ${agentName}/${task.task_type} id=${task.id}`);
+
+    try {
+      // حاول تحميل الوكيل من registry
+      let result = null;
+
+      // مسارات البحث بالترتيب
+      const searchPaths = [
+        `./governance/${agentName}.js`,
+        `./intelligence/${agentName}.js`,
+        `./analysis/${agentName}.js`,
+        `./learning/${agentName}.js`,
+        `./service/${agentName}.js`,
+        `./security/${agentName}.js`,
+        `./sovereign/${agentName.replace('_','-')}.js`,
+      ];
+
+      let agent = null;
+      for (const p of searchPaths) {
+        try {
+          const mod = await import(p);
+          const candidate = mod.default || Object.values(mod)[0];
+          if (candidate && typeof candidate.run === 'function') {
+            agent = candidate;
+            break;
+          }
+        } catch(_) { /* تابع */ }
+      }
+
+      if (agent) {
+        result = await agent.run(payload);
+      } else {
+        // fallback: safeGroqJSON مباشرة للـbrain_query
+        if (task.task_type === 'brain_query' && payload.query) {
+          const { safeGroqJSON } = await import('./utils/safe-json.js');
+          const r = await safeGroqJSON(
+            payload.query,
+            null,
+            agentName
+          );
+          result = { success: !!r.data, data: r.data, error: r.error };
+        } else {
+          throw new Error(`agent_not_found: ${agentName}`);
+        }
+      }
+
+      // حدّث الحالة
+      await pool.query(`
+        UPDATE agent_task_queue
+        SET status='completed',
+            completed_at=NOW(),
+            result=$1
+        WHERE id=$2
+      `, [JSON.stringify(result || {}), task.id]);
+
+      console.log(`✅ task completed: ${agentName}/${task.task_type}`);
+
+    } catch(e) {
+      // فشل — أعد للـpending أو علّم failed
+      const isFinal = task.attempts >= task.max_attempts;
+      await pool.query(`
+        UPDATE agent_task_queue
+        SET status=$1,
+            error_log=COALESCE(error_log,'')||$2
+        WHERE id=$3
+      `, [
+        isFinal ? 'failed' : 'pending',
+        `\n[${new Date().toISOString()}] ${e.message}`,
+        task.id
+      ]);
+      console.error(`❌ task ${isFinal?'failed':'retry'}: ${agentName} — ${e.message}`);
+    }
+  } catch(e) {
+    console.error('❌ processQueue:', e.message);
   }
 }
 
 // ── تسجيل في diagnostic_repairs ─────────────────────────────────
-async function logDiagnostic(agentPath, type, msg) {
+async function logDiagnostic(agentName, type, msg) {
   try {
-    await pool.query(
-      `INSERT INTO diagnostic_repairs
-         (component, issue_type, description, auto_repaired, created_at)
-       VALUES ($1,$2,$3,$4,NOW())`,
-      [agentPath.split('/').pop(), type, msg, false]
-    );
+    await pool.query(`
+      INSERT INTO diagnostic_repairs
+        (component, issue_type, description, auto_repaired, created_at)
+      VALUES ($1,$2,$3,$4,NOW())
+    `, [agentName, type, msg, false]);
   } catch(_) {}
 }
 
-// ── Alert: dead>5 أو failed>20 ──────────────────────────────────
+// ── Alert: failed>20 في ساعة ────────────────────────────────────
 async function checkAlerts() {
   try {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*) as cnt FROM agent_execution_logs
-       WHERE status='failed' AND created_at > NOW() - INTERVAL '1 hour'`
-    );
+    const { rows } = await pool.query(`
+      SELECT COUNT(*) as cnt FROM agent_execution_logs
+      WHERE status='failed' AND created_at > NOW() - INTERVAL '1 hour'
+    `);
     const recentFails = parseInt(rows[0].cnt);
-
-    if (recentFails > 20 || deadCount > 5) {
-      await pool.query(
-        `INSERT INTO diagnostic_repairs
-           (component, issue_type, description, auto_repaired, created_at)
-         VALUES ($1,$2,$3,$4,NOW())`,
-        [
-          'worker-scheduler',
-          'alert',
-          `ALERT: recentFails=${recentFails} deadCount=${deadCount}`,
-          false
-        ]
-      );
-      console.error(`🚨 ALERT: fails=${recentFails} dead=${deadCount}`);
+    if (recentFails > 20) {
+      await logDiagnostic('worker-scheduler', 'alert',
+        `ALERT: recentFails=${recentFails}`);
+      console.error(`🚨 ALERT: recent_fails=${recentFails}`);
     }
   } catch(_) {}
-}
-
-// ── تهيئة الجداول إن غابت ───────────────────────────────────────
-async function ensureTables() {
-  try {
-    const { rows } = await pool.query(
-      `SELECT table_name FROM information_schema.tables
-       WHERE table_schema='public'
-         AND table_name IN ('diagnostic_repairs','agent_execution_logs')`
-    );
-    const found = rows.map(r => r.table_name);
-
-    if (!found.includes('diagnostic_repairs')) {
-      await pool.query(`
-        CREATE TABLE diagnostic_repairs (
-          id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          component     VARCHAR NOT NULL,
-          issue_type    VARCHAR NOT NULL,
-          description   TEXT,
-          auto_repaired BOOLEAN DEFAULT false,
-          created_at    TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      console.log('✅ diagnostic_repairs created');
-    }
-  } catch(e) {
-    console.warn('ensureTables:', e.message);
-  }
 }
 
 // ── بدء الجدولة ─────────────────────────────────────────────────
 async function start() {
-  await ensureTables();
   console.log('🔄 Worker Scheduler starting —', SCHEDULE.length, 'agents');
 
-  for (const [path, interval, priority] of SCHEDULE) {
+  for (const [agentPath, interval, priority] of SCHEDULE) {
     // تشغيل فوري أول مرة
-    runAgent(path, priority);
-
-    const t = setInterval(() => runAgent(path, priority), interval);
-    timers.set(path, t);
+    runAgent(agentPath, priority).catch(() => {});
+    setInterval(() => runAgent(agentPath, priority).catch(() => {}), interval);
   }
 
-  // فحص alerts كل 5 دقائق
+  // queue consumer — كل 10 ثوانٍ
+  setInterval(() => processQueue().catch(() => {}), 10000);
+  processQueue().catch(() => {}); // تشغيل فوري
+
+  // alerts كل 5 دقائق
   setInterval(checkAlerts, 5 * 60000);
 
-  // طباعة إحصائيات كل 10 دقائق
+  // إحصاءات كل 10 دقائق
   setInterval(() => {
     console.log('📊 Worker stats:');
     for (const [k, v] of stats) {
