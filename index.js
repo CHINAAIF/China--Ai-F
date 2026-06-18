@@ -436,3 +436,52 @@ app.get('/api/sentinel/status', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Infrastructure Layer ─────────────────────────────────────────
+import { rateLimitMiddleware } from './agents/utils/rate-limiter.js';
+import { auditPerformance } from './agents/utils/performance-scorer.js';
+import { runRetention, analyzeTablesAfterCleanup } from './agents/utils/data-retention.js';
+
+// Rate Limiting على كل الـAPI
+app.use('/api/', rateLimitMiddleware('api_per_ip'));
+
+// Data Retention كل 24 ساعة
+setInterval(async () => {
+  await runRetention();
+  await analyzeTablesAfterCleanup();
+}, 24 * 60 * 60000);
+
+// Performance Audit كل 30 دقيقة
+setInterval(auditPerformance, 30 * 60000);
+
+// Endpoints
+app.get('/api/performance/scores', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT agent_name, accuracy_score, total_runs, successful_runs,
+             failed_runs, avg_latency_ms, avg_confidence, degraded, last_run
+      FROM agent_performance_scores
+      ORDER BY accuracy_score DESC
+    `);
+    res.json({ timestamp: new Date().toISOString(), total: rows.length, agents: rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/costs/summary', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        agent_name,
+        SUM(tokens_in + tokens_out) as total_tokens,
+        SUM(cost_usd)               as total_cost_usd,
+        COUNT(*) FILTER (WHERE cache_saved=true) as cache_hits,
+        COUNT(*)                    as total_calls
+      FROM cost_tracking
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY agent_name
+      ORDER BY total_cost_usd DESC
+      LIMIT 20
+    `);
+    res.json({ timestamp: new Date().toISOString(), period: '24h', agents: rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
