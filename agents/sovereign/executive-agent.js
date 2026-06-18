@@ -17,6 +17,11 @@ class ExecutiveAgent {
   }
 
   async prepareCommand(operationId, commandType, payload) {
+    // تحقق من command_type قبل DB
+    const VALID_COMMAND_TYPES = ['code','sql','api','config'];
+    if (!VALID_COMMAND_TYPES.includes(commandType)) {
+      commandType = 'api'; // fallback آمن
+    }
     try {
       const analysis = await safeGroqJSON(`أنت الوكيل التنفيذي. حلل هذا الأمر وجهّزه للتنفيذ. النوع: ${commandType}. الحمولة: ${JSON.stringify(payload)}. أجب بـ JSON: {prepared_payload:object,risk_level:string,sandbox_required:boolean,estimated_impact:string,confidence:number}`);
       if(!analysis.data) return { success:false, error:analysis.error };
