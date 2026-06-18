@@ -17,9 +17,9 @@ const BENCHMARK_QUESTIONS = {
 const FREE_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'gemma2-9b-it',
-  'deepseek-r1-distill-llama-70b',
-  'qwen-qwq-32b'
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'allam-2-7b',
+  'openai/gpt-oss-120b'
 ];
 
 class ModelBenchmarkingEngine {

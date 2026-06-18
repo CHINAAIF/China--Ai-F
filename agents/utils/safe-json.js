@@ -35,7 +35,7 @@ const TASK_TO_DOMAIN = {
 const FALLBACK_CHAIN = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'gemma2-9b-it',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
 ];
 
 function detectTask(prompt) {
