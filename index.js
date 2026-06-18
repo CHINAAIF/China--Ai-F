@@ -381,3 +381,22 @@ app.get('/api/judicial/stats', async (req, res) => {
   }
 });
 import { startSelfHealer } from './agents/utils/self-healer.js'; startSelfHealer();
+
+// ── Redundancy Health Endpoint ───────────────────────────────────
+import { getRedundancyHealth } from './agents/utils/redundancy-manager.js';
+
+app.get('/api/redundancy/health', async (req, res) => {
+  try {
+    const health = await getRedundancyHealth();
+    const critical = health.filter(r => r.circuit_open);
+    res.json({
+      timestamp:     new Date().toISOString(),
+      total_functions: health.length,
+      circuits_open:   critical.length,
+      critical:        critical,
+      all:             health
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
