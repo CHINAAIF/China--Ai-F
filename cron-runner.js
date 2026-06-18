@@ -133,3 +133,14 @@ async function start() {
 }
 
 start();
+
+// ── Startup Coordinator Integration ─────────────────────────────
+import { coordinateStartup } from './agents/utils/startup-coordinator.js';
+
+async function pipelineRunner(pipelineName) {
+  const pipeline = PIPELINES.find(p => p.name === pipelineName);
+  if (pipeline) await runPipeline(pipeline);
+}
+
+// استبدال start() بـcoordinator
+coordinateStartup(pipelineRunner);
