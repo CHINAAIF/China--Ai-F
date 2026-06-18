@@ -80,5 +80,3 @@ export async function run(input = {}) {
   catch(e) { return { success: false, error: e.message }; }
 }
 
-
-export async function run(input = {}) { return { success: true, data: { agent: 'china-news-agent', status: 'ok', input } }; }
