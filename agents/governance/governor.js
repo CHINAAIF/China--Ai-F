@@ -1,13 +1,8 @@
-import pg from 'pg';
 import dotenv from 'dotenv';
+import { pool } from '../utils/db.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 dotenv.config();
 
-const { Pool } = pg;
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL, 
-  ssl: { rejectUnauthorized: false } 
-});
 
 export class GovernanceLayer {
 
