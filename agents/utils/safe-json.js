@@ -147,7 +147,10 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
         parsed = JSON.parse(match[0]);
       }
 
-      const confidence = Math.min(100, Math.max(0, Math.round(parsed?.confidence ?? 75)));
+      const rawConf = Number(parsed?.confidence);
+      const confidence = (parsed?.confidence === undefined || parsed?.confidence === null || isNaN(rawConf))
+        ? 75
+        : Math.min(100, Math.max(0, Math.round(rawConf <= 1 ? rawConf * 100 : rawConf)));
       const latency    = Date.now() - start;
 
       await logRouting(agentName, hash, 'executed', m, false, latency);
