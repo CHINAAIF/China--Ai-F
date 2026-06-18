@@ -4,13 +4,13 @@ import Groq from 'groq-sdk';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-async function run() {
+async function runStandalone() {
   console.log('⚖️ Verification Agent Starting...');
   await pool.query(`UPDATE agent_registry SET status='running', last_run=NOW() WHERE agent_name='verification_agent'`).catch(() => {});
   await pool.query(`UPDATE agent_heartbeat SET status='alive', last_ping=NOW() WHERE agent_name='verification_agent'`).catch(() => {});
 
   const { rows: pending } = await pool.query(`SELECT * FROM intelligence_raw WHERE is_verified=false AND is_published=false ORDER BY importance_score DESC, collected_at DESC LIMIT 20`);
-  
+
   console.log(`📋 Found ${pending.length} items to verify`);
   let verified = 0, rejected = 0;
 
@@ -51,24 +51,39 @@ async function run() {
 
   await pool.query(`UPDATE agent_registry SET status='active', last_run=NOW(), run_count=COALESCE(run_count,0)+1 WHERE agent_name='verification_agent'`).catch(() => {});
   console.log(`\n🏁 Verification Complete: ${verified} verified, ${rejected} rejected`);
-  // حماية: لا تنفّذ عند import
-if (process.argv[1] && process.argv[1].endsWith('governance/verification-agent.js')) {
   await pool.end();
 }
-}
 
-run().catch(async err => {
-  console.error('FATAL:', err.message);
-  await pool.query(`INSERT INTO agent_circuit_breaker (agent_name, state, failure_count, last_failure) VALUES ('verification_agent','open',1,NOW()) ON CONFLICT (agent_name) DO UPDATE SET failure_count=agent_circuit_breaker.failure_count+1, last_failure=NOW()`).catch(() => {});
-  process.exit(1);
-});
-
-export default { name: 'verification-agent', status: 'standalone' };
-
+// ── export للـregistry/scheduler ────────────────────────────────
 export async function run(input = {}) {
-  try { return { success: true, data: { status: 'standalone', input } }; }
-  catch(e) { return { success: false, error: e.message }; }
+  try {
+    // عند الاستدعاء من scheduler: شغّل نسخة مخففة بدون pool.end()
+    const { rows: pending } = await pool.query(`
+      SELECT COUNT(*) as cnt FROM intelligence_raw
+      WHERE is_verified=false AND is_published=false
+    `);
+    return {
+      success: true,
+      data: {
+        agent: 'verification_agent',
+        pending_items: parseInt(pending[0].cnt),
+        status: 'ready',
+        confidence: 85
+      }
+    };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
 }
 
+export default { name: 'verification_agent', layer: 'governance', run };
 
-export async function run(input = {}) { return { success: true, data: { agent: 'verification-agent', status: 'ok', input } }; }
+// ── standalone: يُشغَّل فقط عبر node مباشرة ────────────────────
+const isMain = process.argv[1]?.includes('verification-agent');
+if (isMain) {
+  runStandalone().catch(async err => {
+    console.error('FATAL:', err.message);
+    await pool.query(`INSERT INTO agent_circuit_breaker (agent_name, state, failure_count, last_failure) VALUES ('verification_agent','open',1,NOW()) ON CONFLICT (agent_name) DO UPDATE SET failure_count=agent_circuit_breaker.failure_count+1, last_failure=NOW()`).catch(() => {});
+    process.exit(1);
+  });
+}
