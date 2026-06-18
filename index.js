@@ -198,11 +198,6 @@ app.get('/api/tasks/queue', async (req, res) => {
 });
 
 app.use((err, req, res, next) => { logger.error('Unhandled', { error: err.message }); res.status(500).json({ error: 'Internal Error', correlationId: req.correlationId }); });
-app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
-
-
-process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
-
 // ═══ SOVEREIGN MIND API ═══
 import sovereignMind from './agents/sovereign/sovereign-mind.js';
 import executiveAgent from './agents/sovereign/executive-agent.js';
@@ -277,6 +272,12 @@ app.get('/api/sovereign/dashboard', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
+
+
+app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+
+
+process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
 
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
