@@ -23,5 +23,8 @@
     "uuid": "^14.0.0",
     "winston": "^3.19.0"
   },
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }
