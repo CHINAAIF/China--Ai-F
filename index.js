@@ -400,3 +400,39 @@ app.get('/api/redundancy/health', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Gateway Sentinel + Cache Revalidation ───────────────────────
+import { runCacheRevalidation } from './agents/utils/gateway-sentinel.js';
+
+// Cache revalidation كل ساعتين
+setInterval(runCacheRevalidation, 2 * 60 * 60000);
+runCacheRevalidation();
+
+app.get('/api/sentinel/status', async (req, res) => {
+  try {
+    const [memory, blocked] = await Promise.all([
+      pool.query(`
+        SELECT COUNT(*) as total,
+               COUNT(*) FILTER (WHERE valid_until > NOW()) as valid,
+               COUNT(*) FILTER (WHERE valid_until < NOW()) as expired,
+               ROUND(AVG(confidence)) as avg_confidence
+        FROM sovereign_memory_local
+      `),
+      pool.query(`
+        SELECT COUNT(*) as blocked_24h
+        FROM security_filter_log
+        WHERE blocked=true AND created_at > NOW() - INTERVAL '24 hours'
+      `)
+    ]);
+    res.json({
+      timestamp:      new Date().toISOString(),
+      hmac_active:    true,
+      token_ttl_ms:   5000,
+      cache:          memory.rows[0],
+      blocked_24h:    blocked.rows[0].blocked_24h,
+      sentinel:       'active'
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
