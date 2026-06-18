@@ -1,3 +1,4 @@
+console.log("🚀 BOOT_MARKER: ChinaAIF starting...");
 import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
