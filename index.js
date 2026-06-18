@@ -16,7 +16,7 @@ import executiveAgent from './agents/sovereign/executive-agent.js';
 import qualityGateAgent from './agents/sovereign/quality-gate-agent.js';
 import diagnosticAgent from './agents/sovereign/diagnostic-agent.js';
 import { checkAndAlert } from './agents/utils/alert-engine.js';
-import { startSelfHealer } from './agents/utils/self-healer.js'; startSelfHealer();
+import { startSelfHealer } from './agents/utils/self-healer.js';
 import { getRedundancyHealth } from './agents/utils/redundancy-manager.js';
 import { runCacheRevalidation } from './agents/utils/gateway-sentinel.js';
 import { rateLimitMiddleware } from './agents/utils/rate-limiter.js';
@@ -294,6 +294,7 @@ process.on('uncaughtException', err => logger.error('Uncaught', { error: err.mes
 const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
 
 // ── Dynamic imports after server start ──
+startSelfHealer();
 import('./agents/worker-scheduler.js').catch(e => console.error('worker-scheduler error:', e.message));
 // worker-scheduler loaded dynamically after server start
 
