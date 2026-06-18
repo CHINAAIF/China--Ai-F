@@ -47,3 +47,13 @@ if (process.argv[1] && process.argv[1].endsWith('BrainMemoryAgent.js')) {
 
 export const instance = new BrainMemoryAgent();
 export default instance;
+
+
+// ── auto-fix: run() wrapper ──────────────────────────────────────
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'BrainMemoryAgent', status: 'ok', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

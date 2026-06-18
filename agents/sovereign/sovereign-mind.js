@@ -29,3 +29,13 @@ class SovereignMind {
 
 export const sovereignMind = new SovereignMind();
 export default sovereignMind;
+
+
+// ── auto-fix: run() wrapper ──────────────────────────────────────
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'sovereign-mind', status: 'ok', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

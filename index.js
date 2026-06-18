@@ -380,3 +380,4 @@ app.get('/api/judicial/stats', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+import { startSelfHealer } from './agents/utils/self-healer.js'; startSelfHealer();

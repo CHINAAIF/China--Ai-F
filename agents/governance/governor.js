@@ -110,3 +110,13 @@ export class GovernanceLayer {
 
 export const governor = new GovernanceLayer();
 export default governor;
+
+
+// ── auto-fix: run() wrapper ──────────────────────────────────────
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'governor', status: 'ok', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

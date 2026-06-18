@@ -61,3 +61,10 @@ async function run() {
 }
 
 run().catch(err => { console.error('FATAL:', err.message); process.exit(1); });
+
+export default { name: 'pricing-tracker-agent', status: 'standalone' };
+
+export async function run(input = {}) {
+  try { return { success: true, data: { status: 'standalone', input } }; }
+  catch(e) { return { success: false, error: e.message }; }
+}

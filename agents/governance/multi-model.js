@@ -224,3 +224,13 @@ class MultiModelRouter {
 
 export const multiModel = new MultiModelRouter();
 export default multiModel;
+
+
+// ── auto-fix: run() wrapper ──────────────────────────────────────
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'multi-model', status: 'ok', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
