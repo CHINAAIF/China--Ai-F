@@ -5,6 +5,7 @@ import pg from 'pg';
 import crypto from 'crypto';
 import { semanticFirewall } from './semantic-firewall.js';
 import { distill } from './knowledge-distiller.js';
+import { generateAgentToken, verifyAgentToken, fastPath, backgroundValidate } from './gateway-sentinel.js';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -13,16 +14,15 @@ const pool = new pg.Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// ── نماذج مصنّفة بالدقة ─────────────────────────────────────────
 const MODEL_MATRIX = {
-  financial:  { model: 'llama-3.3-70b-versatile',  temp: 0.2 },
-  strategic:  { model: 'llama-3.3-70b-versatile',  temp: 0.2 },
-  analysis:   { model: 'llama-3.3-70b-versatile',  temp: 0.3 },
-  sovereign:  { model: 'llama-3.3-70b-versatile',  temp: 0.1 },
-  classify:   { model: 'llama-3.1-8b-instant',     temp: 0.1 },
-  filter:     { model: 'llama-3.1-8b-instant',     temp: 0.1 },
-  summary:    { model: 'llama-3.1-8b-instant',     temp: 0.2 },
-  default:    { model: 'llama-3.3-70b-versatile',  temp: 0.3 },
+  financial:  { model: 'llama-3.3-70b-versatile', temp: 0.2 },
+  strategic:  { model: 'llama-3.3-70b-versatile', temp: 0.2 },
+  analysis:   { model: 'llama-3.3-70b-versatile', temp: 0.3 },
+  sovereign:  { model: 'llama-3.3-70b-versatile', temp: 0.1 },
+  classify:   { model: 'llama-3.1-8b-instant',    temp: 0.1 },
+  filter:     { model: 'llama-3.1-8b-instant',    temp: 0.1 },
+  summary:    { model: 'llama-3.1-8b-instant',    temp: 0.2 },
+  default:    { model: 'llama-3.3-70b-versatile', temp: 0.3 },
 };
 
 const FALLBACK_CHAIN = [
@@ -46,25 +46,6 @@ function hashQuery(text) {
   return crypto.createHash('sha256').update(text.trim().toLowerCase()).digest('hex').slice(0, 64);
 }
 
-async function checkCache(hash) {
-  try {
-    const { rows } = await pool.query(`
-      SELECT response_data, confidence FROM sovereign_memory_local
-      WHERE query_hash=$1 AND verified=true AND confidence>=80
-      LIMIT 1
-    `, [hash]);
-    if (rows.length > 0) {
-      await pool.query(`
-        UPDATE sovereign_memory_local
-        SET usage_count=usage_count+1, last_used=NOW()
-        WHERE query_hash=$1
-      `, [hash]).catch(()=>{});
-      return rows[0];
-    }
-  } catch(_) {}
-  return null;
-}
-
 async function logRouting(agentName, hash, decision, model, cacheHit, latency) {
   try {
     await pool.query(`
@@ -79,7 +60,20 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
   const start = Date.now();
   const hash  = hashQuery(prompt);
 
-  // ── 1. Semantic Firewall ─────────────────────────────────
+  // ── 1. HMAC Token توليد والتحقق ──────────────────────────
+  let token;
+  try {
+    token = generateAgentToken(agentName);
+    const verify = verifyAgentToken(token, agentName);
+    if (!verify.valid) {
+      console.error(`🚨 HMAC self-verify failed [${agentName}]: ${verify.reason}`);
+      return { success: false, error: `hmac_failed:${verify.reason}`, data: null };
+    }
+  } catch(e) {
+    return { success: false, error: `hmac_error:${e.message}`, data: null };
+  }
+
+  // ── 2. Semantic Firewall ──────────────────────────────────
   try {
     const check = await semanticFirewall(prompt, agentName);
     if (!check.allowed) {
@@ -87,22 +81,27 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
     }
   } catch(_) {}
 
-  // ── 2. Cache Check — صفر تكلفة ──────────────────────────
-  const cached = await checkCache(hash);
-  if (cached) {
-    await logRouting(agentName, hash, 'cache_hit', 'local', true, Date.now()-start);
-    return { success: true, data: cached.response_data, cached: true, model: 'local' };
-  }
+  // ── 3. Fast-Path Cache via Sentinel ──────────────────────
+  try {
+    const fast = await fastPath(hash, agentName, token);
+    if (!fast.allowed) {
+      return { success: false, error: `sentinel:${fast.reason}`, data: null };
+    }
+    if (fast.cache_hit) {
+      await logRouting(agentName, hash, 'fast_path_hit', 'local', true, Date.now()-start);
+      return { success: true, data: fast.data, cached: true, model: 'local', latency_ms: Date.now()-start };
+    }
+  } catch(_) {}
 
-  // ── 3. Judicial Routing — النموذج الأنسب ────────────────
-  const taskType  = detectTask(prompt);
+  // ── 4. Judicial Routing ───────────────────────────────────
+  const taskType = detectTask(prompt);
   const { model: routedModel, temp } = MODEL_MATRIX[taskType];
-  const target    = model || routedModel;
-  const chain     = [target, ...FALLBACK_CHAIN.filter(m => m !== target)];
+  const target   = model || routedModel;
+  const chain    = [target, ...FALLBACK_CHAIN.filter(m => m !== target)];
 
   await logRouting(agentName, hash, `routed:${taskType}`, target, false, 0);
 
-  // ── 4. Execution مع Fallback chain ──────────────────────
+  // ── 5. Execution + Background Validation ─────────────────
   let lastError = null;
   for (const m of chain) {
     try {
@@ -136,9 +135,11 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
 
       await logRouting(agentName, hash, 'executed', m, false, latency);
 
-      // ── 5. Knowledge Distillation — حفر القرارات الناجحة ─
+      // ── 6. Background Distillation — لا ينتظر ────────────
       if (confidence >= 80) {
-        distill(agentName, prompt, parsed, confidence).catch(() => {});
+        backgroundValidate(agentName, hash, async () => {
+          await distill(agentName, prompt, parsed, confidence);
+        });
       }
 
       return { success: true, data: parsed, model: m, cached: false, latency_ms: latency };
