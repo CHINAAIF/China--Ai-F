@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-dotenv.config();
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -12,6 +11,19 @@ import crypto from 'crypto';
 import pg from 'pg';
 import { agentExecute } from './ai-governor.js';
 import { runAIQuery } from './ai-core.js';
+import sovereignMind from './agents/sovereign/sovereign-mind.js';
+import executiveAgent from './agents/sovereign/executive-agent.js';
+import qualityGateAgent from './agents/sovereign/quality-gate-agent.js';
+import diagnosticAgent from './agents/sovereign/diagnostic-agent.js';
+import { checkAndAlert } from './agents/utils/alert-engine.js';
+import { startSelfHealer } from './agents/utils/self-healer.js'; startSelfHealer();
+import { getRedundancyHealth } from './agents/utils/redundancy-manager.js';
+import { runCacheRevalidation } from './agents/utils/gateway-sentinel.js';
+import { rateLimitMiddleware } from './agents/utils/rate-limiter.js';
+import { auditPerformance } from './agents/utils/performance-scorer.js';
+import { runRetention, analyzeTablesAfterCleanup } from './agents/utils/data-retention.js';
+
+dotenv.config();
 
 const { Pool } = pg;
 
@@ -201,10 +213,6 @@ app.get('/api/tasks/queue', async (req, res) => {
 
 app.use((err, req, res, next) => { logger.error('Unhandled', { error: err.message }); res.status(500).json({ error: 'Internal Error', correlationId: req.correlationId }); });
 // ═══ SOVEREIGN MIND API ═══
-import sovereignMind from './agents/sovereign/sovereign-mind.js';
-import executiveAgent from './agents/sovereign/executive-agent.js';
-import qualityGateAgent from './agents/sovereign/quality-gate-agent.js';
-import diagnosticAgent from './agents/sovereign/diagnostic-agent.js';
 
 app.post('/api/sovereign/think', async (req, res) => {
   try {
@@ -284,10 +292,12 @@ process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); 
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
 const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
-import './agents/worker-scheduler.js';
+
+// ── Dynamic imports after server start ──
+import('./agents/worker-scheduler.js').catch(e => console.error('worker-scheduler error:', e.message));
+// worker-scheduler loaded dynamically after server start
 
 // ── Health Check ─────────────────────────────────────────────────
-import { checkAndAlert } from './agents/utils/alert-engine.js';
 
 app.get('/health', async (req, res) => {
   try {
@@ -383,10 +393,8 @@ app.get('/api/judicial/stats', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-import { startSelfHealer } from './agents/utils/self-healer.js'; startSelfHealer();
 
 // ── Redundancy Health Endpoint ───────────────────────────────────
-import { getRedundancyHealth } from './agents/utils/redundancy-manager.js';
 
 app.get('/api/redundancy/health', async (req, res) => {
   try {
@@ -405,7 +413,6 @@ app.get('/api/redundancy/health', async (req, res) => {
 });
 
 // ── Gateway Sentinel + Cache Revalidation ───────────────────────
-import { runCacheRevalidation } from './agents/utils/gateway-sentinel.js';
 
 // Cache revalidation كل ساعتين
 setInterval(runCacheRevalidation, 2 * 60 * 60000);
@@ -441,9 +448,6 @@ app.get('/api/sentinel/status', async (req, res) => {
 });
 
 // ── Infrastructure Layer ─────────────────────────────────────────
-import { rateLimitMiddleware } from './agents/utils/rate-limiter.js';
-import { auditPerformance } from './agents/utils/performance-scorer.js';
-import { runRetention, analyzeTablesAfterCleanup } from './agents/utils/data-retention.js';
 
 // Rate Limiting على كل الـAPI
 app.use('/api/', rateLimitMiddleware('api_per_ip'));
