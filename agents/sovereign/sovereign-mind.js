@@ -1,9 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 
 class SovereignMind {
   constructor() { this.name = 'sovereign_mind'; this.layer = 'sovereign'; this.status = 'active'; }
@@ -29,7 +27,6 @@ class SovereignMind {
 
 export const sovereignMind = new SovereignMind();
 export default sovereignMind;
-
 
 // ── auto-fix: run() wrapper ──────────────────────────────────────
 export async function run(input = {}) {

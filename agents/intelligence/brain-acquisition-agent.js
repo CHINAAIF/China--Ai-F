@@ -1,10 +1,8 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { pingHeartbeat } from '../utils/heartbeat.js';
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 
 class BrainAcquisitionAgent {
   constructor() {

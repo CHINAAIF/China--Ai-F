@@ -1,8 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import Groq from 'groq-sdk';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function run() {

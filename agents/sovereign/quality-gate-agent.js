@@ -1,9 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 
 class QualityGateAgent {
   constructor() { this.name = 'quality_gate_agent'; this.layer = 'sovereign'; this.status = 'active'; }
@@ -44,7 +42,6 @@ class QualityGateAgent {
 
 export const qualityGateAgent = new QualityGateAgent();
 export default qualityGateAgent;
-
 
 // ── auto-fix: run() wrapper ──────────────────────────────────────
 export async function run(input = {}) {

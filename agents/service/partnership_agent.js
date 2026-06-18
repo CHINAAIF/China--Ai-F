@@ -1,8 +1,8 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+
 class Agent {
   constructor() { this.name = 'partnership_agent'; this.layer = 'service'; this.status = 'active'; }
   async initialize() { try { await pool.query('SELECT 1'); return true; } catch(e) { this.status='db_error'; return false; } }

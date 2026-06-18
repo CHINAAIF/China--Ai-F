@@ -1,10 +1,9 @@
 import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import { createHmac } from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 const HMAC_SECRET = process.env.ENCRYPTION_KEY || 'sovereign-default-key';
 
 class ExecutiveAgent {
@@ -40,7 +39,6 @@ class ExecutiveAgent {
 
 export const executiveAgent = new ExecutiveAgent();
 export default executiveAgent;
-
 
 // ── auto-fix: run() wrapper ──────────────────────────────────────
 export async function run(input = {}) {
