@@ -1,4 +1,0 @@
-=== DIAGNOSIS ===
-Total scanned: 122
-Files with issues: 0
-✅ All agents healthy
