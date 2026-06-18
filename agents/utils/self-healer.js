@@ -2,13 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { readdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
-import pg from 'pg';
+import { pool } from './db.js';
 
 const BASE = path.resolve('./agents');
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 const SKIP = ['utils/', 'registry.js', 'brain.js', 'index.js', 'worker-scheduler.js'];
 

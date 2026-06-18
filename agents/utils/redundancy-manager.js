@@ -1,12 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import path from 'path';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 const FAILURE_THRESHOLD = 3;    // عدد الفشل قبل فتح الـCircuit
 const CIRCUIT_RESET_MS  = 5 * 60000; // 5 دقائق إغلاق Circuit

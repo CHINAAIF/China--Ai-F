@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 
@@ -12,11 +12,6 @@ import { existsSync } from 'fs';
 // 5. كل إضافة في ملفات وجداول جديدة فقط — لا تعديل على الموجود
 // 6. لا تضارب مع 108 وكيل موجودين
 // ────────────────────────────────────────────────────────────────
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 // ── ضمان وجود مجلد قبل أي عملية ────────────────────────────────
 export async function ensureDir(path) {

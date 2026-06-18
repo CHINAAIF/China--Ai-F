@@ -1,13 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from './safe-json.js';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 const MODEL_ROUTING = {
   financial:   'llama-3.3-70b-versatile',

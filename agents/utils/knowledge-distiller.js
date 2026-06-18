@@ -1,12 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import crypto from 'crypto';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 export async function distill(agentName, prompt, responseData, confidence) {
   if (!responseData || confidence < 80) return;

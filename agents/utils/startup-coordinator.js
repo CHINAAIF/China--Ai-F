@@ -1,12 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import crypto from 'crypto';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 // ── بصمة فريدة لكل instance ──────────────────────────────────────
 const INSTANCE_ID = crypto.randomBytes(8).toString('hex');

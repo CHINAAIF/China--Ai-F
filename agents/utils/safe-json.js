@@ -1,18 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import Groq from 'groq-sdk';
-import pg from 'pg';
+import { pool } from './db.js';
 import crypto from 'crypto';
 import { semanticFirewall } from './semantic-firewall.js';
 import { distill } from './knowledge-distiller.js';
 import { generateAgentToken, verifyAgentToken, fastPath, backgroundValidate } from './gateway-sentinel.js';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 const MODEL_MATRIX = {
   financial:  { model: 'llama-3.3-70b-versatile', temp: 0.2 },

@@ -1,12 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from './db.js';
 import crypto from 'crypto';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 const THREAT_PATTERNS = [
   { pattern: /ignore previous instructions/i,  type: 'prompt_injection',  score: 95 },

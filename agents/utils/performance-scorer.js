@@ -1,11 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+import { pool } from './db.js';
 
 // ── تحديث Score بعد كل تشغيل ────────────────────────────────────
 export async function updateScore(agentName, success, latencyMs, confidence, tokensUsed = 0) {

@@ -1,12 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import crypto from 'crypto';
-import pg from 'pg';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+import { pool } from './db.js';
 
 const AGENT_SECRET  = process.env.ENCRYPTION_KEY || 'chinaaif-sovereign-secret';
 const TOKEN_TTL_MS  = 5000; // 5 ثوانٍ فقط

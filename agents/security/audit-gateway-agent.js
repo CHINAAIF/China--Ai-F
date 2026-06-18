@@ -1,14 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import pg from 'pg';
+import { pool } from '../utils/db.js';
 import { semanticFirewall } from '../utils/semantic-firewall.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 class AuditGatewayAgent {
   constructor() {

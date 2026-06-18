@@ -1,12 +1,7 @@
-import pg from 'pg';
+import { pool } from './utils/db.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
 
 export class ChinaAIFBrain {
     constructor() {
@@ -24,8 +19,6 @@ export class ChinaAIFBrain {
         return await this.pool.query(query, [approvedId, finalType, '', null]);
     }
 }
-
-
 
 export const brain = new ChinaAIFBrain();
 export default brain;
