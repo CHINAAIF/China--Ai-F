@@ -25,13 +25,6 @@ const MODEL_MATRIX = {
   default:    { model: 'llama-3.3-70b-versatile', temp: 0.3 },
 };
 
-const TASK_TO_DOMAIN = {
-  financial: 'ai_pricing',
-  strategic: 'market_intelligence',
-  analysis:  'llm_benchmarks',
-  sovereign: 'ai_regulations',
-};
-
 const FALLBACK_CHAIN = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
@@ -63,28 +56,11 @@ async function logRouting(agentName, hash, decision, model, cacheHit, latency) {
   } catch(_) {}
 }
 
-async function getBestModel(taskType) {
-  const domain = TASK_TO_DOMAIN[taskType] || null;
-  try {
-    if (domain) {
-      const r = await pool.query(
-        `SELECT model_key FROM model_accuracy_registry WHERE domain=$1 AND sample_count>0 ORDER BY accuracy_score DESC LIMIT 1`,
-        [domain]
-      );
-      if (r.rows[0]?.model_key) return { model: r.rows[0].model_key, source: `db_domain:${domain}` };
-    }
-    const g = await pool.query(
-      `SELECT model_key, AVG(accuracy_score) avg_acc FROM model_accuracy_registry WHERE sample_count>0 GROUP BY model_key ORDER BY avg_acc DESC LIMIT 1`
-    );
-    if (g.rows[0]?.model_key) return { model: g.rows[0].model_key, source: 'db_global' };
-  } catch(_) {}
-  return null;
-}
-
 export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') {
   const start = Date.now();
   const hash  = hashQuery(prompt);
 
+  // ── 1. HMAC Token توليد فقط — fastPath يتحقق هو ──────────
   let token;
   try {
     token = generateAgentToken(agentName);
@@ -92,6 +68,7 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
     return { success: false, error: `hmac_error:${e.message}`, data: null };
   }
 
+  // ── 2. Semantic Firewall ──────────────────────────────────
   try {
     const check = await semanticFirewall(prompt, agentName);
     if (!check.allowed) {
@@ -99,6 +76,7 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
     }
   } catch(_) {}
 
+  // ── 3. Fast-Path Cache via Sentinel ──────────────────────
   try {
     const fast = await fastPath(hash, agentName, token);
     if (!fast.allowed) {
@@ -110,25 +88,25 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
     }
   } catch(_) {}
 
+  // ── 4. Judicial Routing ───────────────────────────────────
   const taskType = detectTask(prompt);
-  const { temp } = MODEL_MATRIX[taskType];
-  let target = model;
-  let routingSource = 'manual';
-  if (!target) {
-    const best = await getBestModel(taskType);
-    if (best) { target = best.model; routingSource = best.source; }
-    else { target = MODEL_MATRIX[taskType].model; routingSource = `static:${taskType}`; }
-  }
-  const chain = [target, ...FALLBACK_CHAIN.filter(m => m !== target)];
-  await logRouting(agentName, hash, `routed:${routingSource}`, target, false, 0);
+  const { model: routedModel, temp } = MODEL_MATRIX[taskType];
+  const target   = model || routedModel;
+  const chain    = [target, ...FALLBACK_CHAIN.filter(m => m !== target)];
 
+  await logRouting(agentName, hash, `routed:${taskType}`, target, false, 0);
+
+  // ── 5. Execution + Background Validation ─────────────────
   let lastError = null;
   for (const m of chain) {
     try {
       const res = await groq.chat.completions.create({
         model: m,
         messages: [
-          { role: 'system', content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.' },
+          {
+            role: 'system',
+            content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.'
+          },
           { role: 'user', content: prompt }
         ],
         temperature: temp,
@@ -152,6 +130,7 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
 
       await logRouting(agentName, hash, 'executed', m, false, latency);
 
+      // ── 6. Background Distillation — لا ينتظر ────────────
       if (confidence >= 80) {
         backgroundValidate(agentName, hash, async () => {
           await distill(agentName, prompt, parsed, confidence);
