@@ -51,7 +51,10 @@ async function run() {
 
   await pool.query(`UPDATE agent_registry SET status='active', last_run=NOW(), run_count=COALESCE(run_count,0)+1 WHERE agent_name='verification_agent'`).catch(() => {});
   console.log(`\n🏁 Verification Complete: ${verified} verified, ${rejected} rejected`);
+  // حماية: لا تنفّذ عند import
+if (process.argv[1] && process.argv[1].endsWith('governance/verification-agent.js')) {
   await pool.end();
+}
 }
 
 run().catch(async err => {
@@ -66,3 +69,6 @@ export async function run(input = {}) {
   try { return { success: true, data: { status: 'standalone', input } }; }
   catch(e) { return { success: false, error: e.message }; }
 }
+
+
+export async function run(input = {}) { return { success: true, data: { agent: 'verification-agent', status: 'ok', input } }; }

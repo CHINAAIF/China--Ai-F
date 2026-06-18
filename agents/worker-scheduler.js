@@ -84,6 +84,15 @@ async function processQueue() {
 
     const task = rows[0];
     const agentName = task.agent_name;
+
+      // قائمة سوداء للملفات standalone التي تغلق pool المشترك
+      const STANDALONE = ['china-news-agent','pricing-tracker-agent','verification-agent','china-social','china_news_agent','pricing_tracker_agent'];
+      if (STANDALONE.includes(agentName)) {
+        console.log(`⏭️ skip standalone: ${agentName}`);
+        await pool.query(`UPDATE agent_task_queue SET status='failed', error_log=COALESCE(error_log,'')||'standalone_agent_not_importable' WHERE id=$1`, [task.id]);
+        return;
+      }
+
     const payload   = task.payload || {};
 
     console.log(`📋 task: ${agentName}/${task.task_type} id=${task.id}`);

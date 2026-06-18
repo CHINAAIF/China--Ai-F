@@ -56,7 +56,10 @@ async function run() {
 
   await pool.query(`UPDATE agent_registry SET status='active', last_run=NOW(), run_count=COALESCE(run_count,0)+1 WHERE agent_name='pricing_tracker_agent'`).catch(() => {});
   console.log(`\n🏁 Pricing Tracker Complete: ${processed}/${models.length} models processed`);
+  // حماية: لا تنفّذ عند import
+if (process.argv[1] && process.argv[1].endsWith('intelligence/pricing-tracker-agent.js')) {
   await pool.end();
+}
 }
 
 run().catch(err => { console.error('FATAL:', err.message); process.exit(1); });
@@ -67,3 +70,6 @@ export async function run(input = {}) {
   try { return { success: true, data: { status: 'standalone', input } }; }
   catch(e) { return { success: false, error: e.message }; }
 }
+
+
+export async function run(input = {}) { return { success: true, data: { agent: 'pricing-tracker-agent', status: 'ok', input } }; }
