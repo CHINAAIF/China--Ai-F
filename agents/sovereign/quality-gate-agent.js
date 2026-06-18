@@ -29,9 +29,9 @@ class QualityGateAgent {
         [decision==='approved', review.data.recommendations?.join('; ')||'', newStatus, commandId]);
 
       await pool.query(
-        `INSERT INTO quality_gate_log (command_id,decision,risk_score,issues_found,recommendations,requires_commander_auth)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [commandId, decision, Math.round(review.data.risk_score||0), JSON.stringify(review.data.issues||[]), JSON.stringify(review.data.recommendations||[]), review.data.requires_commander||false]
+        `INSERT INTO quality_gate_log (command_id,gate_agent,decision,risk_score,issues_found,recommendations,requires_commander_auth)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [commandId, 'quality_gate_agent', decision, Math.round(review.data.risk_score||0), JSON.stringify(review.data.issues||[]), JSON.stringify(review.data.recommendations||[]), review.data.requires_commander||false]
       );
       return { success:true, decision, risk_score:review.data.risk_score, data:review.data };
     } catch(e) { return { success:false, error:e.message }; }

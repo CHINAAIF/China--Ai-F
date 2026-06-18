@@ -16,7 +16,7 @@ class SovereignMind {
       const op = await pool.query(
         `INSERT INTO sovereign_operations (operation_type,strategic_context,decision,models_consulted,consensus_score,status)
          VALUES ($1,$2,$3,$4,$5,'completed') RETURNING id`,
-        ['strategic_analysis', JSON.stringify({input:userInput,context}), result.data.decision, result.data.models_to_consult||[], Math.round(result.data.confidence||75)]
+        ['strategic_analysis', 'sovereign_mind', JSON.stringify({input:userInput,context}), result.data.decision, result.data.models_to_consult||[], Math.round(result.data.confidence||75)]
       );
       return { success:true, operation_id:op.rows[0].id, data:result.data };
     } catch(e) { return { success:false, error:e.message }; }

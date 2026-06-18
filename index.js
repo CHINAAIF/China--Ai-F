@@ -248,6 +248,9 @@ app.get('/api/sovereign/status', async (req, res) => {
       pool.query('SELECT COUNT(*) FROM model_registry_sovereign WHERE is_active=true')
     ]);
     res.json({ agents:108, sovereign_operations: ops.rows, active_models: parseInt(models.rows[0].count), status:'operational' });
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 app.get('/api/sovereign/dashboard', async (req, res) => {
   try {
     const [health, ops, repairs, models, tasks, logs] = await Promise.all([
