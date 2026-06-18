@@ -60,15 +60,10 @@ export async function safeGroqJSON(prompt, model = null, agentName = 'unknown') 
   const start = Date.now();
   const hash  = hashQuery(prompt);
 
-  // ── 1. HMAC Token توليد والتحقق ──────────────────────────
+  // ── 1. HMAC Token توليد فقط — fastPath يتحقق هو ──────────
   let token;
   try {
     token = generateAgentToken(agentName);
-    const verify = verifyAgentToken(token, agentName);
-    if (!verify.valid) {
-      console.error(`🚨 HMAC self-verify failed [${agentName}]: ${verify.reason}`);
-      return { success: false, error: `hmac_failed:${verify.reason}`, data: null };
-    }
   } catch(e) {
     return { success: false, error: `hmac_error:${e.message}`, data: null };
   }
