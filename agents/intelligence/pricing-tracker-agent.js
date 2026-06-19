@@ -64,10 +64,12 @@ if (process.argv[1] && process.argv[1].endsWith('intelligence/pricing-tracker-ag
 
 run().catch(err => { console.error('FATAL:', err.message); process.exit(1); });
 
-export default { name: 'pricing-tracker-agent', status: 'standalone' };
-
 export async function run(input = {}) {
-  try { return { success: true, data: { status: 'standalone', input } }; }
-  catch(e) { return { success: false, error: e.message }; }
+  try {
+    return { success: true, data: { status: 'standalone', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
 }
 
+export default { name: 'pricing-tracker-agent', run };

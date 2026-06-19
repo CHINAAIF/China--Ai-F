@@ -73,10 +73,12 @@ run().catch(async err => {
   process.exit(1);
 });
 
-export default { name: 'china-news-agent', status: 'standalone' };
-
 export async function run(input = {}) {
-  try { return { success: true, data: { status: 'standalone', input } }; }
-  catch(e) { return { success: false, error: e.message }; }
+  try {
+    return { success: true, data: { status: 'standalone', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
 }
 
+export default { name: 'china-news-agent', run };
