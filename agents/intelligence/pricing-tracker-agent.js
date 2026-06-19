@@ -3,8 +3,7 @@ import { pool } from '../utils/db.js';
 import Groq from 'groq-sdk';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-async function run() {
+async function runStandalone() {
   console.log('💰 Pricing Tracker Agent Starting...');
   await pool.query(`UPDATE agent_registry SET status='running', last_run=NOW() WHERE agent_name='pricing_tracker_agent'`).catch(() => {});
   await pool.query(`INSERT INTO agent_heartbeat (agent_name, status, last_ping) VALUES ('pricing_tracker_agent','alive',NOW()) ON CONFLICT (agent_name) DO UPDATE SET status='alive', last_ping=NOW()`).catch(() => {});
@@ -62,7 +61,10 @@ if (process.argv[1] && process.argv[1].endsWith('intelligence/pricing-tracker-ag
 }
 }
 
-run().catch(err => { console.error('FATAL:', err.message); process.exit(1); });
+const isMain = process.argv[1]?.includes('intelligence/pricing-tracker-agent.js');
+if (isMain) {
+  runStandalone().catch(err => { console.error('FATAL:', err.message); process.exit(1); });
+}
 
 export async function run(input = {}) {
   try {

@@ -9,8 +9,7 @@ const SOURCES = [
   { name: 'Leiphone', url: 'https://www.leiphone.com', lang: 'zh' },
   { name: 'Synced', url: 'https://syncedreview.com', lang: 'en' },
 ];
-
-async function run() {
+async function runStandalone() {
   console.log('🔍 China News Agent Starting...');
   
   await pool.query(`UPDATE agent_registry SET status='running', last_run=NOW() WHERE agent_name='china_news_agent'`).catch(() => {});
@@ -67,8 +66,11 @@ if (process.argv[1] && process.argv[1].endsWith('intelligence/china-news-agent.j
 }
 }
 
-run().catch(async err => {
+const isMain = process.argv[1]?.includes('intelligence/china-news-agent.js');
+if (isMain) {
+  runStandalone().catch(async err => {
   console.error('FATAL:', err.message);
+}
   await pool.query(`INSERT INTO agent_circuit_breaker (agent_name, state, failure_count, last_failure) VALUES ('china_news_agent','open',1,NOW()) ON CONFLICT (agent_name) DO UPDATE SET failure_count=agent_circuit_breaker.failure_count+1, last_failure=NOW(), state=CASE WHEN agent_circuit_breaker.failure_count>=2 THEN 'open' ELSE 'half-open' END`).catch(() => {});
   process.exit(1);
 });
