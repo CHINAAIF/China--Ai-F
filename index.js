@@ -294,7 +294,7 @@ app.get('/api/sovereign/dashboard', async (req, res) => {
 
 
 
-app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+// 404 handler moved to end of file
 
 
 process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); }); });
@@ -503,3 +503,6 @@ app.get('/api/costs/summary', async (req, res) => {
     res.json({ timestamp: new Date().toISOString(), period: '24h', agents: rows });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+// ── 404 Handler — must be last ──
+app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
