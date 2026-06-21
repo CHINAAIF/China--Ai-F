@@ -1,4 +1,4 @@
-console.log("🚀 BOOT_MARKER: ChinaAIF starting...");
+console.log("🚀 TRUNKIA Core starting...");
 import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
@@ -70,7 +70,16 @@ app.use('/api/', rateLimit({ windowMs: 60000, max: 100 }));
 app.use('/api/', slowDown({ windowMs: 60000, delayAfter: 30, delayMs: hits => hits * 200 }));
 
 
-app.get('/', (req, res) => res.json({ status: 'active', entity: 'ChinaAIF-Sovereign-Mind', version: '1.0.0' }));
+app.get('/', (req, res) => res.json({
+  platform: 'TRUNKIA',
+  tagline: 'Global AI Model Navigator',
+  version: '1.0.0',
+  status: 'operational',
+  mission: 'Transparency. Comparison. Mastery.',
+  disclaimer: 'Independent platform. Not affiliated with any government or AI company.',
+  docs: '/api/docs',
+  health: '/health'
+}));
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
 app.post('/api/secure-inject',
@@ -292,7 +301,7 @@ process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); 
 
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
-const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ Sovereign Kernel Active on port " + (process.env.PORT || 5000)));
+const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ TRUNKIA Core Active on port " + (process.env.PORT || 5000)));
 
 // ── Dynamic imports after server start ──
 startSelfHealer();

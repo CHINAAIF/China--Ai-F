@@ -1,7 +1,7 @@
 {
-  "name": "china-ai-f-backend",
+  "name": "trunkia-core",
   "version": "1.0.0",
-  "description": "ChinaAIF Backend Stack",
+  "description": "TRUNKIA — Global AI Model Navigator. Transparency. Comparison. Mastery.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
