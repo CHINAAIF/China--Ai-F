@@ -506,3 +506,4 @@ app.get('/api/costs/summary', async (req, res) => {
 
 // ── 404 Handler — must be last ──
 app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+// force redeploy Mon Jun 22 02:25:21 EEST 2026
