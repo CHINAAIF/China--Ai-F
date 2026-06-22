@@ -1,0 +1,39 @@
+=== Escalation Engine Tests ===
+
+--- Test 1: High confidence (>=80) — no escalation expected ---
+(node:18084) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  success: true | model: llama-3.1-8b-instant
+  confidence: 95 | escalation: null
+  _escalated: undefined
+
+--- Test 2: Medium confidence (60-79) — light escalation ---
+  success: true | model: llama-3.1-8b-instant
+  original_confidence: 75 | final: 80
+  tier: light | agreement: 100
+
+--- Test 3: Financial task — consensus escalation always ---
+  success: true | model: llama-3.1-8b-instant
+  final confidence: 77
+  tier: light | agreement: 100
+  needs_sovereign_review: undefined
+
+--- Test 4: Strategic task — consensus escalation always ---
+  success: true | model: meta-llama/llama-4-scout-17b-16e-instruct
+  tier: consensus | agreement: 100
+  needs_sovereign_review: false
+
+--- Test 5: Low confidence (<40) — dual verification ---
+  success: true | model: llama-3.1-8b-instant
+  original_confidence: 0 | final: 0
+  tier: dual_verification | models: ["meta-llama/llama-4-scout-17b-16e-instruct"]
+  avg_agreement: 100
+
+=== Done ===
