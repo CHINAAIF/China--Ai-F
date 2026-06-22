@@ -301,7 +301,6 @@ process.on('SIGTERM', () => { server.close(() => { pool.end(); process.exit(0); 
 
 process.on('uncaughtException', err => logger.error('Uncaught', { error: err.message }));
 
-const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ TRUNKIA Core Active on port " + (process.env.PORT || 5000)));
 
 // ── Dynamic imports after server start ──
 startSelfHealer();
@@ -505,5 +504,20 @@ app.get('/api/costs/summary', async (req, res) => {
 });
 
 // ── 404 Handler — must be last ──
-app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+
 // force redeploy Mon Jun 22 02:25:21 EEST 2026
+
+
+
+// ── 404 Must Be Last ──
+
+
+
+
+
+const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ TRUNKIA Core Active on port " + (process.env.PORT || 5000)));
+
+// ── 404 Must Be Last ──
+
+
+app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
