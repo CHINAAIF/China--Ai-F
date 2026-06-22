@@ -14,7 +14,7 @@ import { loadAllAgents } from './agents/registry.js';
 import healthRouter from './routes/health.js';
 import metricsRouter from './routes/metrics.js';
 import sovereignRouter from './routes/sovereign.js';
-import shieldRouter from './routes/shield.js';
+// shield loaded lazily below
 
 const app  = express();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
@@ -35,7 +35,7 @@ app.use((req, res, next) => {
 app.use('/v1/health',    healthRouter);
 app.use('/v1/metrics',   metricsRouter);
 app.use('/v1/sovereign', sovereignRouter);
-app.use('/v1/shield', shieldRouter);
+app.use('/v1/shield', async (req, res, next) => { try { const { default: sr } = await import('./routes/shield.js'); sr(req, res, next); } catch(e) { res.status(500).json({ error: 'shield_load_error: ' + e.message }); } });
 
 // ── Legacy endpoints ────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
