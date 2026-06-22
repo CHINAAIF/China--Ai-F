@@ -4,7 +4,7 @@
   "description": "TRUNKIA — Global AI Model Navigator. Transparency. Comparison. Mastery.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node --max-old-space-size=512 index.js",
     "cron": "node cron-runner.js"
   },
   "dependencies": {
@@ -26,5 +26,6 @@
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "_railway_deploy": "2026-06-22T08:45:51.160Z"
 }
