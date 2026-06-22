@@ -2,6 +2,10 @@ console.log("🚀 TRUNKIA Core starting...");
 import dotenv from 'dotenv';
 import { agentSupervisor } from './agents/governance/agent-supervisor.js';
 import express from 'express';
+import healthRouter from './routes/health.js';
+import metricsRouter from './routes/metrics.js';
+import sovereignRouter from './routes/sovereign.js';
+import { requestId, apiVersion, requestLogger } from './routes/middleware.js';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -69,6 +73,11 @@ app.use((req, res, next) => {
 
 app.use('/api/', rateLimit({ windowMs: 60000, max: 100 }));
 app.use('/api/', slowDown({ windowMs: 60000, delayAfter: 30, delayMs: hits => hits * 200 }));
+app.use(apiVersion);
+app.use(requestLogger);
+app.use('/v1/health', healthRouter);
+app.use('/v1/metrics', metricsRouter);
+app.use('/v1/sovereign', sovereignRouter);
 
 
 app.get('/', (req, res) => res.json({
