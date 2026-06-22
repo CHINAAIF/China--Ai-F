@@ -1,0 +1,28 @@
+Fixing request_hash in execution-layer.js...
+  OK: request_hash computed from requestPayload directly
+
+Testing...
+(node:7545) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[execution-layer] routing_decisions error: null value in column "request_hash" of relation "routing_decisions" violates not-null constraint
+  success: true
+  confidence: 95 | latency: 5592ms
+
+  routing_decisions last row:
+    task: تشخيص عام
+    request_hash: 805f1888b947f7d7d1b402f3... OK
+    confidence: 75 | outcome: advised
+
+  event_log last 3:
+    execution_complete | 691188d23acedb488ece... OK
+    execution_start | 31411347dea95d7bd845... OK
+    execution_blocked | b528989b192ab4310105... OK
+
+Done

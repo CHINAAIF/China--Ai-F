@@ -1,0 +1,98 @@
+safe-json has escalation: NO
+safe-json has confidence tiers: YES
+(node:16608) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+webhook_queue: 0 rows
+  id | uuid
+  event_type | character varying
+  payload | jsonb
+  sent | boolean
+  attempts | smallint
+  error | text
+  created_at | timestamp without time zone
+  sent_at | timestamp without time zone
+
+subscription_plans: 0 rows
+  id | uuid
+  name | text
+  slug | text
+  description | text
+  currency | text
+  price | numeric
+  billing_interval | USER-DEFINED
+  active | boolean
+  feature_set | jsonb
+  metadata | jsonb
+  created_at | timestamp with time zone
+  updated_at | timestamp with time zone
+
+governance_contracts:
+  id | uuid
+  nonce | character varying
+  customer_id | uuid
+  policy_version_id | uuid
+  content_hash | character varying
+  signature | character varying
+  valid_until | timestamp with time zone
+  used | boolean
+  used_at | timestamp with time zone
+  created_at | timestamp with time zone
+
+routing_decisions:
+  id | uuid
+  event_log_id | uuid
+  customer_id | uuid
+  request_hash | character varying
+  task_type | character varying
+  model_selected | character varying
+  provider_id | uuid
+  policy_version_id | uuid
+  agent_id | character varying
+  causal_reason | jsonb
+  confidence | smallint
+  latency_ms | integer
+  tokens_in | integer
+  tokens_out | integer
+  cost_usd | numeric
+  outcome | character varying
+  outcome_score | smallint
+  created_at | timestamp with time zone
+
+AL L83: [nonce, customerId, 'pending', signature, validUntil]
+
+AL L119: `INSERT INTO event_log (event_type, agent_id, customer_id, payload, payload_hash)
+
+AL L120: VALUES ($1,$2,$3,$4,'pending') RETURNING id`,
+
+AL L130: 'UPDATE event_log SET payload_hash=$1, signature=$2 WHERE id=$3',
+
+AL L136: 'SELECT payload_hash FROM event_log WHERE id=$1', [logId]
+
+AL L138: if (verify.rows[0].payload_hash === 'pending') throw new Error('hash_update_failed');
+
+byok_keys:
+  id | uuid
+  customer_id | uuid
+  provider | character varying
+  key_hash | character varying
+  key_hint | character varying
+  expires_at | timestamp with time zone
+  last_used | timestamp with time zone
+  is_active | boolean
+  created_at | timestamp with time zone
+
+nonce_registry:
+  nonce | character varying
+  agent_id | character varying
+  customer_id | uuid
+  used_at | timestamp with time zone
+  expires_at | timestamp with time zone
+  rejected | boolean
