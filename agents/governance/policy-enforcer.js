@@ -1,6 +1,6 @@
 /**
  * policy-enforcer | layer: governance
- * العقليات: 1(كل طلب عدو) + 16(Compliance) + 2(immutable log) + 13(Causal)
+ * FIX: content::text لضمان hash صحيح + resolution في conflict_log
  */
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
@@ -23,8 +23,10 @@ class PolicyEnforcer {
 
   async loadEffectivePolicy(customer_id = null) {
     try {
+      // content::text — نص خام كما خُزِّن، لضمان hash صحيح
       const r = await pool.query(
-        `SELECT id, policy_type, version_number, content, content_hash, signature, effective_at
+        `SELECT id, policy_type, version_number, content::text AS content_raw,
+                content, content_hash, signature, effective_at
          FROM policy_documents
          WHERE (customer_id=$1 OR customer_id IS NULL) AND effective_at <= NOW()
          ORDER BY effective_at DESC, version_number DESC LIMIT 1`,
@@ -33,24 +35,21 @@ class PolicyEnforcer {
       if (!r.rows.length) return null;
       const policy = r.rows[0];
 
-      // FIX: hash يُحسب على content كما جاء من DB مباشرة (string خام قبل parse)
-      // pg يُعيد content كـobject — نعيد stringify بنفس ترتيب المفاتيح
-      const contentStr = JSON.stringify(policy.content);
-      const computed = crypto.createHash('sha256').update(contentStr).digest('hex');
-
+      // hash على النص الخام كما خُزِّن
+      const computed = crypto.createHash('sha256').update(policy.content_raw).digest('hex');
       if (computed !== policy.content_hash) {
-        console.warn(`⚠️ hash mismatch: computed=${computed.slice(0,16)}... stored=${policy.content_hash.slice(0,16)}...`);
+        console.warn(`⚠️ TAMPERED: ${policy.id}`);
         await this._logConflict({ policy_a_id: policy.id, conflict_type: 'hash_mismatch', context: { computed, stored: policy.content_hash } });
         return { ...policy, integrity: 'TAMPERED' };
       }
-      this._cache.set(policy.id, { ...policy, integrity: 'OK' });
-      return { ...policy, integrity: 'OK' };
+      const cached = { ...policy, integrity: 'OK' };
+      this._cache.set(policy.id, cached);
+      return cached;
     } catch(e) { console.error('❌ loadEffectivePolicy (متابعة):', e.message); return null; }
   }
 
   async createPolicy({ customer_id=null, policy_type='default', content, signed_by='system' }) {
     try {
-      // hash يُحسب على JSON.stringify(content) — نفس ما سيُحسب عند التحقق
       const contentStr = JSON.stringify(content);
       const content_hash = crypto.createHash('sha256').update(contentStr).digest('hex');
       const signature = crypto.createHash('sha256')
@@ -62,13 +61,24 @@ class PolicyEnforcer {
       );
       const version_number = (last.rows[0]?.v || 0) + 1;
 
-      // INSERT content كـjsonb — pg يأخذ string مباشرة
       const r = await pool.query(
         `INSERT INTO policy_documents (customer_id, policy_type, version_number, content, content_hash, signed_by, signature, effective_at)
          VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,NOW()) RETURNING id, version_number`,
         [customer_id, policy_type, version_number, contentStr, content_hash, signed_by, signature]
       );
-      console.log('✅ policy created v'+r.rows[0].version_number+':', r.rows[0].id);
+
+      // تحقق فوري: هل hash يطابق بعد INSERT
+      const verify = await pool.query(
+        `SELECT content::text AS raw, content_hash FROM policy_documents WHERE id=$1`,
+        [r.rows[0].id]
+      );
+      const recomputed = crypto.createHash('sha256').update(verify.rows[0].raw).digest('hex');
+      if (recomputed !== verify.rows[0].content_hash) {
+        console.error(`❌ POST_INSERT hash mismatch! id=${r.rows[0].id}`);
+      } else {
+        console.log('✅ policy created + hash verified v'+r.rows[0].version_number);
+      }
+
       await this._logEvent('policy_created', { policy_id: r.rows[0].id, version_number, policy_type });
       return r.rows[0];
     } catch(e) { console.error('❌ createPolicy (متابعة):', e.message); return null; }
@@ -91,10 +101,11 @@ class PolicyEnforcer {
   async _logConflict({ policy_a_id, policy_b_id=null, conflict_type, context={} }) {
     try {
       await pool.query(
-        `INSERT INTO policy_conflicts_log (policy_a_id, policy_b_id, conflict_type, context, created_at)
-         VALUES ($1,$2,$3,$4,NOW())`,
+        `INSERT INTO policy_conflicts_log (policy_a_id, policy_b_id, conflict_type, resolution, context, created_at)
+         VALUES ($1,$2,$3,'pending_review',$4,NOW())`,
         [policy_a_id, policy_b_id, conflict_type, JSON.stringify(context)]
       );
+      console.log('✅ conflict_log written');
     } catch(e) { console.warn('⚠️ conflict_log (متابعة):', e.message); }
   }
 
@@ -117,8 +128,9 @@ class PolicyEnforcer {
       content: { default_effect: 'allow', rules: [{ action:'inference', resource:'closed_model', effect:'deny' }] },
       signed_by: 'diagnostic'
     });
-    const r = await this.enforce({ action:'inference', resource:'open_model' });
-    return { agent: this.name, layer: this.layer, policy_id: p?.id, enforce_result: r };
+    const r1 = await this.enforce({ action:'inference', resource:'closed_model' });
+    const r2 = await this.enforce({ action:'inference', resource:'open_model' });
+    return { agent: this.name, layer: this.layer, policy_id: p?.id, deny_test: r1, allow_test: r2 };
   }
 }
 
