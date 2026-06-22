@@ -357,7 +357,7 @@ app.get('/api/judicial/stats', async (req, res) => {
         SELECT COUNT(*) as total,
                SUM(usage_count) as total_hits,
                ROUND(AVG(confidence)) as avg_confidence,
-               COUNT(*) FILTER (WHERE is_permanent=null OR verified=true) as verified
+               COUNT(*) FILTER (WHERE verified=true) as verified
         FROM sovereign_memory_local
       `),
       pool.query(`
