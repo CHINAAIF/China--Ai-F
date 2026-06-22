@@ -5,10 +5,10 @@ import crypto from 'crypto';
 import { safetyComplianceLayer } from '../agents/governance/safety-compliance-layer.js';
 import { safeGroqJSON } from '../agents/utils/safe-json.js';
 import { tableExists } from '../agents/utils/executor.js';
-import { pool } from '../utils/db.js';
+import pg from 'pg';
 
 var router = Router();
-// Using shared pool from db.js
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 function hashText(text) {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex').substring(0, 64);
