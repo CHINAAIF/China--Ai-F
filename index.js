@@ -1,5 +1,6 @@
 console.log("🚀 TRUNKIA Core starting...");
 import dotenv from 'dotenv';
+import { agentSupervisor } from './agents/governance/agent-supervisor.js';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -517,7 +518,6 @@ app.get('/api/costs/summary', async (req, res) => {
 
 
 // ── Agent Supervisor ────────────────────────────────────────────
-import { agentSupervisor } from './agents/governance/agent-supervisor.js';
 agentSupervisor.initialize().then(() => {
   setInterval(() => agentSupervisor.run({}), 5 * 60000);
 });
