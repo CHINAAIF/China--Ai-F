@@ -1,0 +1,45 @@
+=== Model Benchmarking Engine Tests ===
+
+--- Init ---
+(node:21156) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+initialize: true | status: active
+
+--- Test 1: Single question benchmark (pricing) ---
+  agreement: 100%
+  avg_confidence: 43
+  models_succeeded: 3/3
+  llama-3.3-70b-versatile: conf:0 lat:1066ms
+  llama-3.1-8b-instant: conf:50 lat:299ms
+  meta-llama/llama-4-scout-17b-16e-instruct: conf:80 lat:262ms
+
+--- Test 2: Full domain benchmark (content) ---
+  questions_tested: 3
+  avg_agreement: 67%
+  avg_confidence: 88
+  avg_latency: 472ms
+
+--- Test 3: Rankings ---
+  pricing domain rankings:
+    #1 meta-llama/llama-4-scout-17b-16e-instruct | acc:80 | samples:1 | lat:262ms
+    #2 llama-3.1-8b-instant | acc:50 | samples:1 | lat:299ms
+    #3 llama-3.3-70b-versatile | acc:0 | samples:1 | lat:1066ms
+
+--- Test 4: Diagnostic ---
+  {
+  "agent": "model_benchmarking_engine",
+  "status": "ok",
+  "models_available": 3,
+  "domains_available": 5,
+  "total_registry_entries": 30,
+  "timestamp": "2026-06-22T14:39:55.468Z"
+}
+
+Done
