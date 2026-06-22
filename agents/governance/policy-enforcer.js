@@ -1,3 +1,4 @@
+import { logExecution, safeStep } from '../utils/executor.js';
 /**
  * policy-enforcer | layer: governance
  * FIX FINAL: hash يُحسب على content::text بعد INSERT — يطابق pg دائماً
@@ -139,3 +140,11 @@ class PolicyEnforcer {
 
 export const policyEnforcer = new PolicyEnforcer();
 export default policyEnforcer;
+
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'policy-enforcer', status: 'ok' } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

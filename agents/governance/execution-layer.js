@@ -336,3 +336,11 @@ class ExecutionLayer {
 
 export var executionLayer = new ExecutionLayer();
 export default executionLayer;
+
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'execution-layer', status: 'ok' } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

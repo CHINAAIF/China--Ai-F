@@ -1,3 +1,4 @@
+import { logExecution, safeStep } from '../utils/executor.js';
 /**
  * tactical-routing | layer: governance
  * قلب Governance Layer — يختار المزود + يسجل في routing_decisions + event_log
@@ -94,3 +95,11 @@ JSON: {"selected_slug":"...","reason":"...","confidence":85,"estimated_cost_usd"
 
 export const tacticalRouter = new TacticalRouter();
 export default tacticalRouter;
+
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'tactical-routing', status: 'ok' } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

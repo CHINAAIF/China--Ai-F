@@ -1,0 +1,5 @@
+=== TRUNKIA Shield API Tests ===
+
+Starting server...
+--- Test 1: GET /v1/shield/status ---
+TEST ERROR: connect ECONNREFUSED 127.0.0.1:3000

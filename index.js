@@ -14,6 +14,7 @@ import { loadAllAgents } from './agents/registry.js';
 import healthRouter from './routes/health.js';
 import metricsRouter from './routes/metrics.js';
 import sovereignRouter from './routes/sovereign.js';
+import shieldRouter from './routes/shield.js';
 
 const app  = express();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
@@ -34,6 +35,7 @@ app.use((req, res, next) => {
 app.use('/v1/health',    healthRouter);
 app.use('/v1/metrics',   metricsRouter);
 app.use('/v1/sovereign', sovereignRouter);
+app.use('/v1/shield', shieldRouter);
 
 // ── Legacy endpoints ────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));

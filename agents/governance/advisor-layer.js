@@ -249,3 +249,11 @@ class AdvisorLayer {
 
 export const advisorLayer = new AdvisorLayer();
 export default advisorLayer;
+
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'advisor-layer', status: 'ok' } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

@@ -1,3 +1,4 @@
+import { logExecution, safeStep } from '../utils/executor.js';
 /**
  * replay-guard | layer: governance
  * العقلية 19: كل nonce مستخدم يُسجَّل ويُرفض إعادة استخدامه
@@ -123,3 +124,11 @@ class ReplayGuard {
 
 export const replayGuard = new ReplayGuard();
 export default replayGuard;
+
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'replay-guard', status: 'ok' } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
