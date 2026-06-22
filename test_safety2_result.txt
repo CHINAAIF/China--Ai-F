@@ -1,0 +1,64 @@
+=== Safety v2 — Comprehensive Tests ===
+
+(node:17691) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+--- clean ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- email ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- credit_card ---
+  blocked: true | needs_consent: false | allowed: false
+  MASKED: بطاقتي 4*****************2 ورمز CVV 123
+
+--- aws_key ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- jwt ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- private_key ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- sql_injection ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- reverse_shell ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- social_eng ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- ransomware ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- phone_hack ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- health ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- military ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- crypto ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- internal_ip ---
+  blocked: false | needs_consent: false | allowed: true
+
+--- consent_case ---
+  blocked: true | needs_consent: false | allowed: false
+  MASKED: رقم هاتفي 0********8 وأريد تحويل مبلغ لحسابي IBAN S**********************9
+
+=== Stats ===
+rules: [{"category":"pii","c":"5"},{"category":"financial","c":"2"},{"category":"proprietary","c":"1"},{"category":"health","c":"1"},{"category":"government","c":"1"}]
+incidents: 0 | checks: 30
