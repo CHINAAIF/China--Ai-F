@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export class ChinaAIFBrain {
+export class TRUNKIABrain {
     constructor() {
         this.pool = pool;
     }
@@ -20,5 +20,5 @@ export class ChinaAIFBrain {
     }
 }
 
-export const brain = new ChinaAIFBrain();
+export const brain = new TRUNKIABrain();
 export default brain;

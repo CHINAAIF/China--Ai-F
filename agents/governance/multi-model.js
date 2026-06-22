@@ -36,7 +36,7 @@ class MultiModelRouter {
       const res = await this.groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: systemPrompt || 'You are ChinaAIF Intelligence Core.' },
+          { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
           { role: 'user', content: prompt }
         ],
         max_tokens: 1024,

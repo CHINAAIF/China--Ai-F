@@ -3,7 +3,7 @@ dotenv.config();
 import { readdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 
-const BASE = '/data/data/com.termux/files/home/downloads/China--Ai-F/agents';
+const BASE = '/app/agents';
 
 // ── الوكلاء الـstandalone لا نلمسهم ────────────────────────────
 const SKIP = [

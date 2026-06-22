@@ -34,7 +34,7 @@ async function execWithTimeout(agentPath, input, timeoutMs) {
   return new Promise(async (resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('TIMEOUT_' + timeoutMs + 'ms')), timeoutMs);
     try {
-      const basePath = '/data/data/com.termux/files/home/downloads/China--Ai-F/agents/';
+      const basePath = '/app/agents/';
       const mod = await import(basePath + agentPath + '?t=' + Date.now());
       const agent = mod.default || Object.values(mod).find(v => typeof v?.run === 'function');
       if (!agent?.run) throw new Error('NO_RUN_METHOD');

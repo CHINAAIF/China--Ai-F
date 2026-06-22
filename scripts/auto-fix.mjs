@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 
-const BASE = '/data/data/com.termux/files/home/downloads/China--Ai-F/agents';
+const BASE = '/app/agents';
 
 // ── الـstandalone لا نضيف لهم run() بل export default فقط ──────
 const STANDALONE = [

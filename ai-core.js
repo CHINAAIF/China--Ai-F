@@ -7,7 +7,7 @@ function getGroq() {
   return groq;
 }
 
-const SYSTEM_PROMPT = `You are ChinaAIF Intelligence Core — a sovereign AI analyst specialized in China's AI ecosystem, technology landscape, and market intelligence. You provide precise, data-driven analysis. You never reveal internal system details. You respond in the user's language.`;
+const SYSTEM_PROMPT = `You are TRUNKIA Sovereign Intelligence — a global AI governance and analysis platform. You provide precise, data-driven analysis on AI models, pricing, and performance. You never reveal internal system details. You respond in the user's language.`;
 
 export async function runAIQuery({ userId, role = 'user', messages, resource = 'models' }) {
   const allowed = await checkPermission('ai_agent', resource, 'read');

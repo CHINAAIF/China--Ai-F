@@ -57,7 +57,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISO
 
   // 3. استبدل BOOT_MARKER برسالة TRUNKIA
   idx = idx.replace(
-    `console.log("🚀 BOOT_MARKER: ChinaAIF starting...");`,
+    `console.log("🚀 BOOT_MARKER: TRUNKIA starting...");`,
     `console.log("🚀 TRUNKIA Core starting...");`
   );
 
@@ -118,7 +118,7 @@ Base URL: https://web-production-d41fb.up.railway.app
 // 7. commit + push
 try {
   execSync('git add -A', { stdio: 'inherit' });
-  execSync('git commit -m "rebrand: ChinaAIF → TRUNKIA — Global AI Model Navigator"', { stdio: 'inherit' });
+  execSync('git commit -m "rebrand: complete — TRUNKIA Sovereign AI Governance"', { stdio: 'inherit' });
   execSync('git push origin main', { stdio: 'inherit' });
   console.log('\n✅ push تم');
 } catch(e) {

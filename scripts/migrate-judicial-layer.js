@@ -8,8 +8,8 @@ import { existsSync } from 'fs';
 const dirs = ['scripts','agents/sovereign','agents/utils','agents/governance'];
 for (const d of dirs) {
   try {
-    if (!existsSync(`/data/data/com.termux/files/home/downloads/China--Ai-F/${d}`))
-      await mkdir(`/data/data/com.termux/files/home/downloads/China--Ai-F/${d}`, { recursive: true });
+    if (!existsSync(`/app/${d}`))
+      await mkdir(`/app/${d}`, { recursive: true });
   } catch(_) {}
 }
 
