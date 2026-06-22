@@ -515,24 +515,18 @@ app.get('/api/costs/summary', async (req, res) => {
 
 
 
-const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ TRUNKIA Core Active on port " + (process.env.PORT || 5000)));
 
-// ── 404 Must Be Last ──
-
-
-app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
-
-// ── Agent Supervisor ─────────────────────────────────────────────
+// ── Agent Supervisor ────────────────────────────────────────────
 import { agentSupervisor } from './agents/governance/agent-supervisor.js';
-
 agentSupervisor.initialize().then(() => {
   setInterval(() => agentSupervisor.run({}), 5 * 60000);
-  console.log('✅ Agent Supervisor active');
+});
+app.get('/api/supervision/health', async (req, res) => {
+  try { const r = await agentSupervisor.runDiagnostic(); res.json({ timestamp: new Date().toISOString(), ...r }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/supervision/health', async (req, res) => {
-  try {
-    const r = await agentSupervisor.runDiagnostic();
-    res.json({ timestamp: new Date().toISOString(), ...r });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
+// ── 404 Must Be Last ────────────────────────────────────────────
+app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+
+const server = app.listen(process.env.PORT || 5000, "0.0.0.0", () => console.log("✅ TRUNKIA Core Active on port " + (process.env.PORT || 5000)));
