@@ -55,7 +55,7 @@ app.get('/api/sovereign/dashboard', async (req, res) => {
     ]);
     res.json({
       timestamp: new Date().toISOString(),
-      system: { agents_total: agents.rows[0]?.total || 108, heartbeat: heartbeat.rows, active_models: models.rows[0]?.total || 12 },
+      system: { agents_total: agents.rows[0]?.total || 108, heartbeat_count: heartbeat.rows.length, active_models: models.rows[0]?.total || 12 },
       sovereign: { operations_count: ops.rows[0]?.ops || 0 },
       diagnostics: { repairs_count: repairs.rows[0]?.count || 0 },
       tasks: { queue_count: tasks.rows[0]?.count || 0 },
