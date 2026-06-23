@@ -1,0 +1,11 @@
+import fs from 'fs';
+var H = '/data/data/com.termux/files/home/downloads/China--Ai-F';
+var sq = H + '/routes/sovereign.js';
+var sc = fs.readFileSync(sq, 'utf8');
+sc = sc.replace('recent_activity: activity.rows,', 'recent_activity_count: activity.rows.length,');
+sc = sc.replace('heartbeat: heartbeat.rows,', 'heartbeat_count: heartbeat.rows.length,');
+sc = sc.replace('sovereign: { operations: ops.rows },', 'sovereign: { operations_count: ops.rows.length },');
+sc = sc.replace('diagnostics: { repairs: repairs.rows },', 'diagnostics: { repairs_count: repairs.rows.length },');
+sc = sc.replace('tasks: { queue: tasks.rows },', 'tasks: { queue_count: tasks.rows.length },');
+fs.writeFileSync(sq, sc, 'utf8');
+console.log('OK: sovereign');
