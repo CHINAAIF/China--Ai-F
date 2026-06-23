@@ -52,7 +52,7 @@ function deepValidate(obj, path, depth) {
   if (depth > MAX_OBJECT_DEPTH) return [{ type: 'DEPTH_EXCEEDED', path }];
   if (typeof obj === 'string') return validateString(obj, path).issues;
   if (Array.isArray(obj)) {
-    if (obj.length > MAX_ARRAY_LENGTH) all.push({ type: 'ARRAY_TOO_LARGE', path, length: obj.length });
+    if (obj.length > MAX_ARRAY_LENGTH) { all.push({ type: 'ARRAY_TOO_LARGE', path, length: obj.length }); return all; }
     obj.slice(0, 10).forEach((item, i) => all.push(...deepValidate(item, path + '[' + i + ']', depth + 1)));
     return all;
   }
@@ -94,9 +94,11 @@ export function validateOutput(data, options) {
 
   const injections = issues.filter(i => i.type === 'INJECTION_ATTEMPT');
   const sensitive  = issues.filter(i => i.type === 'SENSITIVE_DATA');
+  const oversized  = issues.filter(i => i.type === 'ARRAY_TOO_LARGE' || i.type === 'OVERSIZED' || i.type === 'PAYLOAD_TOO_LARGE');
 
   if (injections.length > 0)                      { result.risk_level = 'critical'; result.valid = false; }
   else if (sensitive.length > 0 && !allowSensitive){ result.risk_level = 'high';    result.valid = false; }
+  else if (oversized.length > 0)                   { result.risk_level = 'high';    result.valid = false; }
   else if (issues.length > 3)                       result.risk_level = 'medium';
   else if (issues.length > 0)                       result.risk_level = 'low';
 
