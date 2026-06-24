@@ -142,13 +142,13 @@ app.use('/v1/sovereign', async (req, res, next) => { try { const r = await impor
 app.use('/v1/shield', async (req, res, next) => { try { const r = await import('./routes/shield.js'); r.default(req, res, next); } catch(e) { res.status(500).json({ error: e.message }); } });
 
 app.get('/api/sovereign/dashboard', db, async (req, res) => {
-  try { const a = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents_total: a.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const a = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(() => ({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents_total: a.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/supervision/health', db, async (req, res) => {
-  try { const r = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents: r.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const r = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(() => ({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents: r.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/judicial/stats', db, async (req, res) => {
-  try { const c = await pool.query('SELECT COUNT(*) as total FROM sovereign_memory_local').catch(()=>({rows:[{total:0}]})); res.json({ timestamp: new Date().toISOString(), cache: c.rows[0] }); } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const c = await pool.query('SELECT COUNT(*) as total FROM sovereign_memory_local').catch(() => ({rows:[{total:0}]})); res.json({ timestamp: new Date().toISOString(), cache: c.rows[0] }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/redundancy/health', db, async (req, res) => {
   try { const {rows} = await pool.query('SELECT function_key, active_agent, failure_count, circuit_open FROM agent_redundancy_map ORDER BY failure_count DESC LIMIT 20'); res.json({ timestamp: new Date().toISOString(), total: rows.length, all: rows }); } catch(e) { res.status(500).json({ error: e.message }); }
@@ -161,20 +161,20 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 app.use((err, req, res, next) => { console.error('[ERR] ' + err.message); res.status(500).json({ error: 'Internal Error' }); });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('TRUNKIA listening on 0.0.0.0:' + PORT + ' | env PORT=' + process.env.PORT + ' | RAILWAY_PORT=' + (process.env.RAILWAY_PORT || 'not set') + ' | hostname=' + process.env.HOSTNAME || 'unknown');
+  console.log('TRUNKIA on 0.0.0.0:' + PORT);
   ready = true;
   (async () => {
     try {
       var dbUrl = fixDbUrl(process.env.DATABASE_URL);
-      console.log('[DB] connecting with fixed URL...');
+      console.log('[DB] connecting...');
       pool = new pg.Pool({ connectionString: dbUrl, max: 15, idleTimeoutMillis: 30000 });
       var test = await pool.query('SELECT 1 as ok');
-      console.log('[OK] db_pool test=' + test.rows[0].ok);
+      console.log('[OK] db_pool');
     } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
-    try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] shutdown'); } catch(e) { console.log('[FAIL] shutdown: ' + e.message); }
-    try { const { loadAllAgents } = await import('./agents/registry.js'); await loadAllAgents(); console.log('[OK] agents'); } catch(e) { console.log('[FAIL] agents: ' + e.message); }
-    try { const { agentSupervisor } = await import('./agents/governance/agent-supervisor.js'); await agentSupervisor.initialize(); setInterval(() => agentSupervisor.run({}).catch(e => console.error('[SUP]', e.message)), 300000); console.log('[OK] supervisor'); } catch(e) { console.log('[FAIL] supervisor: ' + e.message); }
-    try { const { startSelfHealer } = await import('./agents/utils/self-healer.js'); startSelfHealer(); console.log('[OK] healer'); } catch(e) { console.log('[FAIL] healer: ' + e.message); }
+    try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] shutdown'); } catch(e) { console.log('[SKIP] shutdown'); }
+    try { const { loadAllAgents } = await import('./agents/registry.js'); await loadAllAgents(); console.log('[OK] agents'); } catch(e) { console.log('[SKIP] agents: ' + e.message); }
+    try { const { agentSupervisor } = await import('./agents/governance/agent-supervisor.js'); await agentSupervisor.initialize(); setInterval(() => agentSupervisor.run({}).catch(() => {}), 300000); console.log('[OK] supervisor'); } catch(e) { console.log('[SKIP] supervisor'); }
+    try { const { startSelfHealer } = await import('./agents/utils/self-healer.js'); startSelfHealer(); console.log('[OK] healer'); } catch(e) { console.log('[SKIP] healer'); }
     console.log('Init done');
   })();
 });
