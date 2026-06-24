@@ -153,7 +153,7 @@ app.listen(PORT, '0.0.0.0', function() {
     try {
       var dbUrl = fixDbUrl(process.env.DATABASE_URL);
       console.log('[DB] connecting...');
-      pool = new pg.Pool({ connectionString: dbUrl, max: 15, idleTimeoutMillis: 30000 });
+      pool = new pg.Pool({ connectionString: dbUrl, ssl: {rejectUnauthorized: false}, max: 15, idleTimeoutMillis: 30000 });
       var test = await pool.query('SELECT 1 as ok');
       console.log('[OK] db_pool');
     } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
