@@ -22,9 +22,11 @@ app.get('/api/intelligence/cost-calculate', async (req, res) => {
   var pool=getPool();
   try{
     var slug=req.query.model||'gpt-4o';var inT=(parseInt(req.query.input)||1000)/1000000;var outT=(parseInt(req.query.output)||500)/1000000;
-    var r=await pool.query("SELECT tier_name, price FROM model_pricing_tiers t JOIN models m ON t.model_id=m.id WHERE m.slug=$1 AND t.active=true",[slug]);await pool.end();
-    var inP=r.rows.find(x=>x.tier_name.includes('input'))||{price:0};var outP=r.rows.find(x=>x.tier_name.includes('output'))||{price:0};
-    res.json({model:slug,input_tokens:req.query.input,output_tokens:req.query.output,cost_per_request:(inT*inP.price+outT*outP.price).toFixed(6),currency:'USD',input_rate:inP.price,output_rate:outP.price});
+    var r=await pool.query("SELECT tier_name, price FROM model_pricing_tiers t JOIN models m ON t.model_id=m.id WHERE m.slug=$1 AND t.active=true ORDER BY t.tier_name",[slug]);await pool.end();
+    var inP=r.rows.find(x=>x.tier_name.toLowerCase().includes('input'))||r.rows[0]||{price:0};
+    var outP=r.rows.find(x=>x.tier_name.toLowerCase().includes('output'))||r.rows[1]||{price:0};
+    var cost=(inT*inP.price+outP*outP.price).toFixed(6);
+    res.json({model:slug,input_tokens:req.query.input,output_tokens:req.query.output,cost_per_request:cost,currency:'USD',input_rate:inP.price,output_rate:outP.price,tiers:r.rows.map(x=>x.tier_name)});
   }catch(e){await pool.end();res.status(500).json({error:e.message});}
 });
 
@@ -37,8 +39,7 @@ app.get('/api/intelligence/compare', async (req, res) => {
   var pool=getPool();
   try{
     var slugs=(req.query.models||'gpt-4o').split(',');
-    var q='SELECT m.slug, m.name, COALESCE(AVG(mb.score),0) as avg_score, COUNT(DISTINCT bd.slug) as benchmarks_count FROM models m LEFT JOIN model_benchmarks mb ON m.id=mb.model_id LEFT JOIN benchmark_definitions bd ON mb.benchmark_definition_id=bd.id WHERE m.slug=ANY($1) GROUP BY m.slug, m.name';
-    var r=await pool.query(q,[slugs]);await pool.end();res.json({models:r.rows,compared:slugs});
+    var r=await pool.query("SELECT m.slug, m.name, COALESCE(AVG(mb.score),0) as avg_score, COUNT(DISTINCT bd.slug) as benchmarks_count FROM models m LEFT JOIN model_benchmarks mb ON m.id=mb.model_id LEFT JOIN benchmark_definitions bd ON mb.benchmark_definition_id=bd.id WHERE m.slug=ANY($1) GROUP BY m.slug, m.name",[slugs]);await pool.end();res.json({models:r.rows,compared:slugs});
   }catch(e){await pool.end();res.status(500).json({error:e.message});}
 });
 
@@ -46,7 +47,7 @@ app.get('/api/intelligence/safety/:slug', async (req, res) => {
   var pool=getPool();
   try{
     var r=await pool.query("SELECT g.*, m.slug FROM model_geopolitical_risk g JOIN models m ON g.model_id=m.id WHERE m.slug=$1",[req.params.slug]);await pool.end();
-    var d=r.rows[0]||{};var trust=Math.max(0,100-(d.risk_score||0));res.json({model:req.params.slug,trust_score:trust,risk_score:d.risk_score||0,data_law_risk:d.data_law_risk||0,sanctions_risk:d.sanctions_risk||0,blocking_risk:d.blocking_risk||0,censorship_risk:d.censorship_risk||0,country:d.country_of_origin,assessed_at:d.assessed_at});
+    var d=r.rows[0]||{};res.json({model:req.params.slug,trust_score:Math.max(0,100-(d.risk_score||0)),risk_score:d.risk_score||0,data_law_risk:d.data_law_risk||0,sanctions_risk:d.sanctions_risk||0,blocking_risk:d.blocking_risk||0,censorship_risk:d.censorship_risk||0,country:d.country_of_origin,assessed_at:d.assessed_at});
   }catch(e){await pool.end();res.status(500).json({error:e.message});}
 });
 
