@@ -22,7 +22,7 @@ app.get('/api/intelligence/geopolitical/:slug', async (req, res) => {
       connectionString: fixDbUrl(process.env.DATABASE_URL),
       ssl: {rejectUnauthorized:false}
     });
-    const r = await pool.query("SELECT * FROM model_geopolitical_risk WHERE model_slug=$1", [req.params.slug]);
+    const r = await pool.query("SELECT * FROM model_geopolitical_risk WHERE model_id=$1", [req.params.slug]);
     await pool.end();
     res.json(r.rows[0] || {error:'not found'});
   } catch(e) {
