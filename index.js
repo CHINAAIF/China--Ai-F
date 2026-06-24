@@ -15,18 +15,12 @@ var ready = false;
 
 function fixDbUrl(url) {
   if (!url) return url;
-  var parts = url.split('?');
-  if (parts.length < 2) return url;
-  var base = parts[0];
-  var params = parts[1].split('&');
-  var filtered = [];
-  for (var i = 0; i < params.length; i++) {
-    if (params[i].indexOf('channel_binding=') !== 0) {
-      filtered.push(params[i]);
-    }
-  }
-  if (filtered.length === 0) return base;
-  return base + '?' + filtered.join('&');
+  try {
+    var u = new URL(url);
+    u.searchParams.delete('sslmode');
+    u.searchParams.delete('channel_binding');
+    return u.toString();
+  } catch(e) { return url; }
 }
 
 app.use(function(req, res, next) { console.log('[REQ] ' + req.method + ' ' + req.url); next(); });
@@ -159,7 +153,7 @@ app.listen(PORT, '0.0.0.0', function() {
     try {
       var dbUrl = fixDbUrl(process.env.DATABASE_URL);
       console.log('[DB] connecting...');
-      pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, max: 15, idleTimeoutMillis: 30000 });
+      pool = new pg.Pool({ connectionString: dbUrl, max: 15, idleTimeoutMillis: 30000 });
       var test = await pool.query('SELECT 1 as ok');
       console.log('[OK] db_pool');
     } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
