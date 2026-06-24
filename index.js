@@ -20,8 +20,7 @@ function fixDbUrl(url) {
     u.searchParams.delete('sslmode');
     u.searchParams.delete('channel_binding');
     return u.toString();
-  }
-  catch(e) { return url; }
+  } catch(e) { return url; }
 }
 
 app.use(function(req, res, next) { console.log('[REQ] ' + req.method + ' ' + req.url); next(); });
