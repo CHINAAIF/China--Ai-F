@@ -17,8 +17,8 @@ function fixDbUrl(url) {
   if (!url) return url;
   try {
     var u = new URL(url);
-    u.searchParams.delete('sslmode');
     u.searchParams.delete('channel_binding');
+    u.searchParams.set('sslmode', 'require');
     return u.toString();
   } catch(e) { return url; }
 }
