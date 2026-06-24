@@ -26,13 +26,15 @@ app.get('/api/intelligence/geopolitical/:slug', async (req, res) => {
 app.get('/api/intelligence/cost-calculate', async (req, res) => {
   var pool=getPool();
   try{
-    var r=await pool.query("SELECT m.slug, p.input_price, p.output_price FROM models m JOIN model_pricing_tiers p ON m.id=p.model_id WHERE m.slug=$1 AND p.active=true LIMIT 1",[req.query.model||'gpt-4o']);
-    await pool.end();
-    var d=r.rows[0]||{};
+    var slug=req.query.model||'gpt-4o';
     var inT=(parseInt(req.query.input)||1000)/1000000;
     var outT=(parseInt(req.query.output)||500)/1000000;
-    var cost=((inT*(d.input_price||0))+(outT*(d.output_price||0))).toFixed(6);
-    res.json({model:req.query.model,input_tokens:req.query.input,output_tokens:req.query.output,cost_per_request:cost,currency:'USD'});
+    var r=await pool.query("SELECT tier_name, price FROM model_pricing_tiers t JOIN models m ON t.model_id=m.id WHERE m.slug=$1 AND t.active=true",[slug]);
+    await pool.end();
+    var inP=r.rows.find(x=>x.tier_name.includes('input'))||{price:0};
+    var outP=r.rows.find(x=>x.tier_name.includes('output'))||{price:0};
+    var cost=(inT*inP.price+outT*outP.price).toFixed(6);
+    res.json({model:slug,input_tokens:req.query.input,output_tokens:req.query.output,cost_per_request:cost,currency:'USD',input_rate:inP.price,output_rate:outP.price});
   }catch(e){await pool.end();res.status(500).json({error:e.message});}
 });
 
