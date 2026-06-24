@@ -15,7 +15,12 @@ var ready = false;
 
 function fixDbUrl(url) {
   if (!url) return url;
-  try { var u = new URL(url); u.searchParams.delete('sslmode'); u.searchParams.set('sslmode', 'no-verify'); return u.toString(); }
+  try {
+    var u = new URL(url);
+    u.searchParams.delete('sslmode');
+    u.searchParams.delete('channel_binding');
+    return u.toString();
+  }
   catch(e) { return url; }
 }
 
