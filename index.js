@@ -161,7 +161,7 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 app.use((err, req, res, next) => { console.error('[ERR] ' + err.message); res.status(500).json({ error: 'Internal Error' }); });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('TRUNKIA listening on 0.0.0.0:' + PORT + ' | env PORT=' + process.env.PORT + ' | RAILWAY_PORT=' + (process.env.RAILWAY_PORT || 'not set') + ' | hostname=' + require('os').hostname());
+  console.log('TRUNKIA listening on 0.0.0.0:' + PORT + ' | env PORT=' + process.env.PORT + ' | RAILWAY_PORT=' + (process.env.RAILWAY_PORT || 'not set') + ' | hostname=' + process.env.HOSTNAME || 'unknown');
   ready = true;
   (async () => {
     try {
