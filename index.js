@@ -5,37 +5,21 @@ import cors from 'cors';
 import pg from 'pg';
 import crypto from 'crypto';
 
-process.on('unhandledRejection', (r) => {
-  console.error('[FENCE] rejection:', r?.message || r);
-});
-process.on('uncaughtException', (e) => {
-  console.error('[FENCE] exception:', e.message);
-  // لا ندع العملية تموت
-});
+process.on('unhandledRejection', (r) => console.error('[FENCE] rejection:', r?.message || r));
+process.on('uncaughtException', (e) => console.error('[FENCE] exception:', e.message));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 let pool = null;
 let ready = false;
 
-// === إصلاح SSL: نزع sslmode من URL واستبداله بالصحيح ===
 function fixDbUrl(url) {
   if (!url) return url;
-  let fixed = url;
-  // أزل أي sslmode موجود
-  fixed = fixed.replace(/[?&]sslmode=[^&]*/g, '');
-  // أزل trailing & أو ? فارغ
-  fixed = fixed.replace(/[?&]$/, '');
-  // أضف sslmode=no-verify
-  fixed += (fixed.includes('?') ? '&' : '?') + 'sslmode=no-verify';
-  return fixed;
+  let f = url.replace(/[?&]sslmode=[^&]*/g, '').replace(/[?&]$/, '');
+  return f + (f.includes('?') ? '&' : '?') + 'sslmode=no-verify';
 }
 
-app.use((req, res, next) => {
-  console.log('[REQ] ' + req.method + ' ' + req.url);
-  next();
-});
-
+app.use((req, res, next) => { console.log('[REQ] ' + req.method + ' ' + req.url); next(); });
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' }));
 app.use(express.json({ limit: '50kb' }));
@@ -48,7 +32,6 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  console.log('[RESP] health ok=' + ready);
   res.json({ status: ready ? 'ok' : 'starting', ready, port: PORT, time: new Date().toISOString() });
 });
 app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -94,9 +77,9 @@ app.get('/api/intelligence/compare', db, async (req, res) => {
     const slugs = (req.query.models || '').split(',').filter(Boolean).slice(0, 5);
     if (slugs.length < 2) return res.status(400).json({ error: 'Provide 2+ slugs' });
     const models = await pool.query('SELECT id, slug, name, model_type, supported_languages FROM models WHERE slug = ANY($1)', [slugs]);
-    if (models.rows.length < 2) return res.status(404).json({ error: 'Not all found', found: models.rows.map(m => m.slug) });
+    if (models.rows.length < 2) return res.status(404).json({ error: 'Not all found' });
     const ids = models.rows.map(m => m.id);
-    const [benchmarks, capabilities, pricing, geo] = await Promise.all([
+    const [ben, cap, pri, geo] = await Promise.all([
       pool.query("SELECT m.slug, bd.slug as bslug, bd.name, mb.score, mb.percentile FROM model_benchmarks mb JOIN models m ON mb.model_id=m.id JOIN benchmark_definitions bd ON mb.benchmark_definition_id=bd.id WHERE m.id=ANY($1)", [ids]),
       pool.query("SELECT m.slug, mc.capability FROM model_capabilities mc JOIN models m ON mc.model_id=m.id WHERE m.id=ANY($1)", [ids]),
       pool.query("SELECT m.slug, pt.tier_name, pt.input_price, pt.output_price, pt.pricing_model, pt.availability FROM model_pricing_tiers pt JOIN models m ON pt.model_id=m.id WHERE m.id=ANY($1) AND pt.active=true", [ids]),
@@ -104,9 +87,9 @@ app.get('/api/intelligence/compare', db, async (req, res) => {
     ]);
     const comp = {};
     for (const m of models.rows) comp[m.slug] = { name: m.name, type: m.model_type, languages: m.supported_languages?.length || 0, benchmarks: {}, capabilities: [], pricing: [], geopolitical: null };
-    for (const b of benchmarks.rows) { if (comp[b.slug]) comp[b.slug].benchmarks[b.bslug] = { name: b.name, score: b.score, percentile: b.percentile }; }
-    for (const c of capabilities.rows) { if (comp[c.slug]) comp[c.slug].capabilities.push(c.capability); }
-    for (const p of pricing.rows) { if (comp[p.slug]) comp[p.slug].pricing.push({ tier: p.tier_name, input_price: p.input_price, output_price: p.output_price, model: p.pricing_model, availability: p.availability }); }
+    for (const b of ben.rows) { if (comp[b.slug]) comp[b.slug].benchmarks[b.bslug] = { name: b.name, score: b.score, percentile: b.percentile }; }
+    for (const c of cap.rows) { if (comp[c.slug]) comp[c.slug].capabilities.push(c.capability); }
+    for (const p of pri.rows) { if (comp[p.slug]) comp[p.slug].pricing.push({ tier: p.tier_name, input_price: p.input_price, output_price: p.output_price, model: p.pricing_model, availability: p.availability }); }
     for (const g of geo.rows) { if (comp[g.slug]) comp[g.slug].geopolitical = { risk_score: g.risk_score, country: g.country_of_origin, gdpr: g.gdpr_compliant, restricted: g.export_restricted }; }
     res.json({ models: comp, compared: slugs });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -130,14 +113,19 @@ app.get('/api/intelligence/safety/:slug', db, async (req, res) => {
   try {
     const model = await pool.query('SELECT id, slug, name FROM models WHERE slug = $1', [req.params.slug]);
     if (!model.rows.length) return res.status(404).json({ error: 'Not found' });
+    const mid = model.rows[0].id;
     const [geo, caps] = await Promise.all([
-      pool.query('SELECT * FROM model_geopolitical_risk WHERE model_id = $1', [model.rows[0].id),
-      pool.query("SELECT capability FROM model_capabilities WHERE model_id = $1 AND capability IN ('streaming','function_calling','code','vision','arabic','long_context')", [model.rows[0].id])
+      pool.query('SELECT * FROM model_geopolitical_risk WHERE model_id = $1', [mid]),
+      pool.query("SELECT capability FROM model_capabilities WHERE model_id = $1 AND capability IN ('streaming','function_calling','code','vision','arabic','long_context')", [mid])
     ]);
     const g = geo.rows[0] || {};
     const sc = caps.rows.map(r => r.capability);
     let trust = 50;
-    if (g.gdpr_compliant) trust += 15; if (!g.export_restricted) trust += 10; if (!g.government_linked) trust += 10; if (sc.includes('function_calling')) trust += 5; if (g.risk_score <= 3) trust += 10;
+    if (g.gdpr_compliant) trust += 15;
+    if (!g.export_restricted) trust += 10;
+    if (!g.government_linked) trust += 10;
+    if (sc.includes('function_calling')) trust += 5;
+    if (g.risk_score <= 3) trust += 10;
     res.json({ model: req.params.slug, name: model.rows[0].name, trust_score: Math.min(100, trust), geopolitical: { risk_score: g.risk_score, country: g.country_of_origin, gdpr: g.gdpr_compliant, export_restricted: g.export_restricted, blockable: g.can_be_blocked, blocking_regions: g.blocking_regions || [], government_linked: g.government_linked }, safety_capabilities: sc });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -148,7 +136,7 @@ app.use('/v1/sovereign', async (req, res, next) => { try { const r = await impor
 app.use('/v1/shield', async (req, res, next) => { try { const r = await import('./routes/shield.js'); r.default(req, res, next); } catch(e) { res.status(500).json({ error: e.message }); } });
 
 app.get('/api/sovereign/dashboard', db, async (req, res) => {
-  try { const [a] = await Promise.all([pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]}))]); res.json({ timestamp: new Date().toISOString(), agents_total: a.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const a = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents_total: a.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/supervision/health', db, async (req, res) => {
   try { const r = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents: r.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
@@ -163,31 +151,20 @@ app.get('/api/performance/scores', db, async (req, res) => {
   try { const {rows} = await pool.query('SELECT agent_name, accuracy_score, total_runs, failed_runs, degraded FROM agent_performance_scores ORDER BY accuracy_score DESC LIMIT 20'); res.json({ timestamp: new Date().toISOString(), total: rows.length, agents: rows }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.use((req, res) => { console.log('[404] ' + req.url); res.status(404).json({ error: 'Not Found' }); });
+app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 app.use((err, req, res, next) => { console.error('[ERR] ' + err.message); res.status(500).json({ error: 'Internal Error' }); });
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('TRUNKIA listening on ' + PORT);
   ready = true;
-
   (async () => {
     try {
-      // === SSL FIX: نستخدم URL مصلح بدون sslmode يتعارض ===
       const dbUrl = fixDbUrl(process.env.DATABASE_URL);
       console.log('[DB] connecting...');
-      pool = new pg.Pool({
-        connectionString: dbUrl,
-        max: 15,
-        idleTimeoutMillis: 30000
-      });
-      const test = await pool.query('SELECT 1 as ok');
-      console.log('[OK] db_pool connected, test=' + test.rows[0].ok);
-    } catch(e) {
-      console.log('[FAIL] db_pool: ' + e.message);
-      // لا نوقف الخادم — /health يرد بدون DB
-      return;
-    }
-
+      pool = new pg.Pool({ connectionString: dbUrl, max: 15, idleTimeoutMillis: 30000 });
+      await pool.query('SELECT 1 as ok');
+      console.log('[OK] db_pool');
+    } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
     try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] shutdown'); } catch(e) { console.log('[FAIL] shutdown: ' + e.message); }
     try { const { loadAllAgents } = await import('./agents/registry.js'); await loadAllAgents(); console.log('[OK] agents'); } catch(e) { console.log('[FAIL] agents: ' + e.message); }
     try { const { agentSupervisor } = await import('./agents/governance/agent-supervisor.js'); await agentSupervisor.initialize(); setInterval(() => agentSupervisor.run({}).catch(e => console.error('[SUP]', e.message)), 300000); console.log('[OK] supervisor'); } catch(e) { console.log('[FAIL] supervisor: ' + e.message); }
