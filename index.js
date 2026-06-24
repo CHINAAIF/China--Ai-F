@@ -5,17 +5,34 @@ import cors from 'cors';
 import pg from 'pg';
 import crypto from 'crypto';
 
-process.on('unhandledRejection', (r) => console.error('[FENCE] rejection:', r?.message || r));
-process.on('uncaughtException', (e) => console.error('[FENCE] exception:', e.message));
+process.on('unhandledRejection', (r) => {
+  console.error('[FENCE] rejection:', r?.message || r);
+});
+process.on('uncaughtException', (e) => {
+  console.error('[FENCE] exception:', e.message);
+  // لا ندع العملية تموت
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 let pool = null;
 let ready = false;
 
-// === REQUEST LOGGER — أول شيء ===
+// === إصلاح SSL: نزع sslmode من URL واستبداله بالصحيح ===
+function fixDbUrl(url) {
+  if (!url) return url;
+  let fixed = url;
+  // أزل أي sslmode موجود
+  fixed = fixed.replace(/[?&]sslmode=[^&]*/g, '');
+  // أزل trailing & أو ? فارغ
+  fixed = fixed.replace(/[?&]$/, '');
+  // أضف sslmode=no-verify
+  fixed += (fixed.includes('?') ? '&' : '?') + 'sslmode=no-verify';
+  return fixed;
+}
+
 app.use((req, res, next) => {
-  console.log('[REQ] ' + req.method + ' ' + req.url + ' from ' + (req.headers['x-forwarded-for'] || req.ip));
+  console.log('[REQ] ' + req.method + ' ' + req.url);
   next();
 });
 
@@ -31,17 +48,11 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  console.log('[RESP] health → ' + (ready ? 'ok' : 'starting'));
+  console.log('[RESP] health ok=' + ready);
   res.json({ status: ready ? 'ok' : 'starting', ready, port: PORT, time: new Date().toISOString() });
 });
-app.get('/ping', (req, res) => {
-  console.log('[RESP] ping');
-  res.json({ ok: true, ts: Date.now() });
-});
-
-app.get('/api/debug/init', (req, res) => {
-  res.json({ ready, port: PORT, env_port: process.env.PORT, node: process.version });
-});
+app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
+app.get('/api/debug/init', (req, res) => res.json({ ready, port: PORT, node: process.version }));
 
 function db(req, res, next) {
   if (!pool) return res.status(503).json({ error: 'DB not ready' });
@@ -120,7 +131,7 @@ app.get('/api/intelligence/safety/:slug', db, async (req, res) => {
     const model = await pool.query('SELECT id, slug, name FROM models WHERE slug = $1', [req.params.slug]);
     if (!model.rows.length) return res.status(404).json({ error: 'Not found' });
     const [geo, caps] = await Promise.all([
-      pool.query('SELECT * FROM model_geopolitical_risk WHERE model_id = $1', [model.rows[0].id]),
+      pool.query('SELECT * FROM model_geopolitical_risk WHERE model_id = $1', [model.rows[0].id),
       pool.query("SELECT capability FROM model_capabilities WHERE model_id = $1 AND capability IN ('streaming','function_calling','code','vision','arabic','long_context')", [model.rows[0].id])
     ]);
     const g = geo.rows[0] || {};
@@ -137,7 +148,7 @@ app.use('/v1/sovereign', async (req, res, next) => { try { const r = await impor
 app.use('/v1/shield', async (req, res, next) => { try { const r = await import('./routes/shield.js'); r.default(req, res, next); } catch(e) { res.status(500).json({ error: e.message }); } });
 
 app.get('/api/sovereign/dashboard', db, async (req, res) => {
-  try { const [agents] = await Promise.all([pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]}))]); res.json({ timestamp: new Date().toISOString(), agents_total: agents.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const [a] = await Promise.all([pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]}))]); res.json({ timestamp: new Date().toISOString(), agents_total: a.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/supervision/health', db, async (req, res) => {
   try { const r = await pool.query('SELECT COUNT(*) as total FROM agent_registry').catch(()=>({rows:[{total:108}]})); res.json({ timestamp: new Date().toISOString(), agents: r.rows[0]?.total || 108 }); } catch(e) { res.status(500).json({ error: e.message }); }
@@ -158,9 +169,26 @@ app.use((err, req, res, next) => { console.error('[ERR] ' + err.message); res.st
 app.listen(PORT, '0.0.0.0', () => {
   console.log('TRUNKIA listening on ' + PORT);
   ready = true;
+
   (async () => {
-    try { pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 15 }); await pool.query('SELECT 1'); console.log('[OK] db_pool'); } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
-    try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] graceful_shutdown'); } catch(e) { console.log('[FAIL] graceful_shutdown: ' + e.message); }
+    try {
+      // === SSL FIX: نستخدم URL مصلح بدون sslmode يتعارض ===
+      const dbUrl = fixDbUrl(process.env.DATABASE_URL);
+      console.log('[DB] connecting...');
+      pool = new pg.Pool({
+        connectionString: dbUrl,
+        max: 15,
+        idleTimeoutMillis: 30000
+      });
+      const test = await pool.query('SELECT 1 as ok');
+      console.log('[OK] db_pool connected, test=' + test.rows[0].ok);
+    } catch(e) {
+      console.log('[FAIL] db_pool: ' + e.message);
+      // لا نوقف الخادم — /health يرد بدون DB
+      return;
+    }
+
+    try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] shutdown'); } catch(e) { console.log('[FAIL] shutdown: ' + e.message); }
     try { const { loadAllAgents } = await import('./agents/registry.js'); await loadAllAgents(); console.log('[OK] agents'); } catch(e) { console.log('[FAIL] agents: ' + e.message); }
     try { const { agentSupervisor } = await import('./agents/governance/agent-supervisor.js'); await agentSupervisor.initialize(); setInterval(() => agentSupervisor.run({}).catch(e => console.error('[SUP]', e.message)), 300000); console.log('[OK] supervisor'); } catch(e) { console.log('[FAIL] supervisor: ' + e.message); }
     try { const { startSelfHealer } = await import('./agents/utils/self-healer.js'); startSelfHealer(); console.log('[OK] healer'); } catch(e) { console.log('[FAIL] healer: ' + e.message); }
