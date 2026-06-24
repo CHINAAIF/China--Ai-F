@@ -15,8 +15,14 @@ let ready = false;
 
 function fixDbUrl(url) {
   if (!url) return url;
-  let f = url.replace(/[?&]sslmode=[^&]*/g, '').replace(/[?&]$/, '');
-  return f + (f.includes('?') ? '&' : '?') + 'sslmode=no-verify';
+  try {
+    var u = new URL(url);
+    u.searchParams.delete('sslmode');
+    u.searchParams.set('sslmode', 'no-verify');
+    return u.toString();
+  } catch(e) {
+    return url;
+  }
 }
 
 app.use((req, res, next) => { console.log('[REQ] ' + req.method + ' ' + req.url); next(); });
@@ -35,7 +41,7 @@ app.get('/health', (req, res) => {
   res.json({ status: ready ? 'ok' : 'starting', ready, port: PORT, time: new Date().toISOString() });
 });
 app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
-app.get('/api/debug/init', (req, res) => res.json({ ready, port: PORT, node: process.version }));
+app.get('/api/debug/init', (req, res) => res.json({ ready, port: PORT, node: process.version, db: pool ? 'connected' : 'disconnected' }));
 
 function db(req, res, next) {
   if (!pool) return res.status(503).json({ error: 'DB not ready' });
@@ -159,11 +165,11 @@ app.listen(PORT, '0.0.0.0', () => {
   ready = true;
   (async () => {
     try {
-      const dbUrl = fixDbUrl(process.env.DATABASE_URL);
-      console.log('[DB] connecting...');
+      var dbUrl = fixDbUrl(process.env.DATABASE_URL);
+      console.log('[DB] connecting with fixed URL...');
       pool = new pg.Pool({ connectionString: dbUrl, max: 15, idleTimeoutMillis: 30000 });
-      await pool.query('SELECT 1 as ok');
-      console.log('[OK] db_pool');
+      var test = await pool.query('SELECT 1 as ok');
+      console.log('[OK] db_pool test=' + test.rows[0].ok);
     } catch(e) { console.log('[FAIL] db_pool: ' + e.message); return; }
     try { const { setupGracefulShutdown } = await import('./utils/graceful-shutdown.js'); setupGracefulShutdown(pool); console.log('[OK] shutdown'); } catch(e) { console.log('[FAIL] shutdown: ' + e.message); }
     try { const { loadAllAgents } = await import('./agents/registry.js'); await loadAllAgents(); console.log('[OK] agents'); } catch(e) { console.log('[FAIL] agents: ' + e.message); }
