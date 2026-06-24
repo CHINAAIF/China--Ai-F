@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 var app = express();
@@ -14,14 +17,43 @@ var START_TIME = Date.now();
 var LAST_SYNC = null;
 var cronJobs = {};
 var cronStats = {};
+var requestCounter = 0;
+
+/* ===== SECURITY: Helmet ===== */
+app.use(helmet({
+  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"] } },
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
+}));
+
+/* ===== SECURITY: CORS ===== */
+app.use(cors({
+  origin: function(origin, callback) {
+    var allowed = (process.env.CORS_ORIGINS || '*').split(',').map(function(s) { return s.trim(); });
+    if (allowed.indexOf('*') !== -1 || !origin || allowed.indexOf(origin) !== -1) { callback(null, true); }
+    else { callback(new Error('CORS blocked')); }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  maxAge: 86400
+}));
+
+/* ===== SECURITY: Rate Limiting ===== */
+var globalLimiter = rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Rate limit exceeded', retry_after: 60 } });
+app.use('/api/', globalLimiter);
+
+var strictLimiter = rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Strict rate limit exceeded', retry_after: 60 } });
+app.use('/api/self-heal/', strictLimiter);
+app.use('/api/scheduler/trigger/', strictLimiter);
+
+/* ===== SECURITY: Body Size ===== */
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 /* ===== CIRCUIT BREAKER ===== */
 var circuit = { state: 'CLOSED', failures: 0, lastFailure: 0, successThreshold: 3, failureThreshold: 5, resetTimeoutMs: 30000, halfOpenSuccesses: 0 };
 function circuitIsOpen() {
-  if (circuit.state === 'OPEN') {
-    if (Date.now() - circuit.lastFailure > circuit.resetTimeoutMs) { circuit.state = 'HALF_OPEN'; circuit.halfOpenSuccesses = 0; return false; }
-    return true;
-  }
+  if (circuit.state === 'OPEN') { if (Date.now() - circuit.lastFailure > circuit.resetTimeoutMs) { circuit.state = 'HALF_OPEN'; circuit.halfOpenSuccesses = 0; return false; } return true; }
   return false;
 }
 function circuitRecordSuccess() {
@@ -134,22 +166,28 @@ async function selfHeal() {
 function fmt(s) { var h = Math.floor(s / 3600); var m = Math.floor((s % 3600) / 60); return h + 'h ' + m + 'm ' + (s % 60) + 's'; }
 function grade(sc) { if (sc >= 90) return 'A'; if (sc >= 80) return 'B'; if (sc >= 70) return 'C'; if (sc >= 60) return 'D'; return 'F'; }
 
-/* ===== MIDDLEWARE ===== */
+/* ===== MIDDLEWARE: Request Tracking ===== */
 app.use(function(req, res, next) {
   var start = Date.now();
   var rid = Math.random().toString(36).substring(2, 10);
   req._startTime = start; req._requestId = rid;
+  requestCounter++;
   res.setHeader('x-request-id', rid);
   res.setHeader('x-powered-by', 'TRUNKIA');
   res.setHeader('x-circuit-state', circuit.state);
+  res.removeHeader('X-Powered-By');
   var origEnd = res.end;
   res.end = function(chunk, enc) { res.setHeader('x-response-time', (Date.now() - start) + 'ms'); origEnd.call(res, chunk, enc); };
   next();
 });
-app.use(function(err, req, res, next) { console.error('[UNCAUGHT]', err.message); res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' }); });
+app.use(function(err, req, res, next) {
+  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'Forbidden', request_id: req._requestId });
+  console.error('[UNCAUGHT]', err.message);
+  res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
+});
 
 /* ===== SYSTEM ===== */
-app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 6, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 20, time: new Date().toISOString() }); });
+app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 7, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 21, requests_served: requestCounter, time: new Date().toISOString() }); });
 app.get('/ping', function(req, res) { res.json({ pong: true, ts: Date.now() }); });
 
 /* ===== INTELLIGENCE ===== */
@@ -166,21 +204,26 @@ app.get('/api/agents/layers', async function(req, res) { try { var r = await saf
 app.get('/api/agents/stats', async function(req, res) { try { var r = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted,coalesce(sum(run_count),0) as total_runs FROM agent_registry"); var files = scanAgentFiles(); res.json({ database: r.rows[0], filesystem: { total_files: files.length }, last_sync: LAST_SYNC }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== SUPERVISOR ===== */
-app.get('/api/supervisor/diagnostic', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); res.json({ health_score: sc, health_grade: grade(sc), circuit: { state: circuit.state, failures: circuit.failures }, checks: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL, passed: dbL < 500 }, agents: { filesystem: files.length, database: parseInt(d.total, 10), synced: parseInt(d.total, 10) >= files.length, passed: parseInt(d.total, 10) >= files.length }, memory: { used_mb: usedMb, percent: Math.round((usedMb / 512) * 100), passed: usedMb < 460 }, faults: { count: parseInt(d.faulted, 10), passed: parseInt(d.faulted, 10) === 0 }, circuit: { state: circuit.state, passed: circuit.state === 'CLOSED' } }, timestamp: new Date().toISOString() }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
-app.get('/api/supervisor/status', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); res.json({ db_latency_ms: Date.now() - dbS, db_status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', circuit: circuit, cron_jobs_active: Object.keys(cronJobs).length, cron_stats: cronStats, last_sync: LAST_SYNC, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }); } catch (e) { res.json({ db_status: 'error', circuit: circuit, error: e.message }); } });
+app.get('/api/supervisor/diagnostic', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); res.json({ health_score: sc, health_grade: grade(sc), circuit: { state: circuit.state, failures: circuit.failures }, checks: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL, passed: dbL < 500 }, agents: { filesystem: files.length, database: parseInt(d.total, 10), synced: parseInt(d.total, 10) >= files.length, passed: parseInt(d.total, 10) >= files.length }, memory: { used_mb: usedMb, percent: Math.round((usedMb / 512) * 100), passed: usedMb < 460 }, faults: { count: parseInt(d.faulted, 10), passed: parseInt(d.faulted, 10) === 0 }, circuit: { state: circuit.state, passed: circuit.state === 'CLOSED' } }, security: { helmet: true, rate_limit: '120/min global, 20/min strict', cors: 'enabled', body_limit: '100kb' }, timestamp: new Date().toISOString() }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/supervisor/status', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); res.json({ db_latency_ms: Date.now() - dbS, db_status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', circuit: circuit, cron_jobs_active: Object.keys(cronJobs).length, cron_stats: cronStats, last_sync: LAST_SYNC, requests_served: requestCounter, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }); } catch (e) { res.json({ db_status: 'error', circuit: circuit, error: e.message }); } });
 
 /* ===== SCHEDULER ===== */
 app.get('/api/scheduler/status', function(req, res) { var jobs = []; var k = Object.keys(cronJobs); for (var i = 0; i < k.length; i++) jobs.push({ name: k[i], running: true, last_execution: cronStats[k[i]] || null }); res.json({ active_jobs: jobs.length, jobs: jobs }); });
 app.get('/api/scheduler/trigger/:name', async function(req, res) { try { var n = req.params.name; if (n === 'agent-sync') { var r = await syncAgentsToDb(); res.json({ triggered: n, result: r }); } else if (n === 'agent-heartbeat') { var r2 = await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); res.json({ triggered: n, updated: r2.rowCount }); } else if (n === 'self-heal') { var h = await selfHeal(); res.json({ triggered: n, result: h }); } else { res.status(404).json({ error: 'Unknown job', available: ['agent-sync', 'agent-heartbeat', 'self-heal'] }); } } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== SYSTEM PULSE ===== */
-app.get('/api/system/pulse', async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 6, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: cronStats }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures } }, endpoints: 20, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
-app.get('/api/system/metrics', function(req, res) { var mem = process.memoryUsage(); res.json({ process: { pid: process.pid, node_version: process.version, platform: process.platform, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }, memory: { rss_mb: Math.round(mem.rss / 1024 / 1024), heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024), heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024) } }); });
+app.get('/api/system/pulse', async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 7, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: cronStats }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures }, security: { helmet: true, rate_limit_active: true, cors_enabled: true } }, endpoints: 21, requests_served: requestCounter, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
+app.get('/api/system/metrics', function(req, res) { var mem = process.memoryUsage(); res.json({ process: { pid: process.pid, node_version: process.version, platform: process.platform, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000), requests_served: requestCounter }, memory: { rss_mb: Math.round(mem.rss / 1024 / 1024), heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024), heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024) }, security: { helmet: true, rate_limit: '120/min', cors: true, body_limit: '100kb' } }); });
 
 /* ===== SELF-HEAL + CIRCUIT ===== */
 app.get('/api/self-heal/run', async function(req, res) { try { var r = await selfHeal(); res.json(r); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/self-heal/status', function(req, res) { res.json({ circuit_breaker: { state: circuit.state, failures: circuit.failures, last_failure: circuit.lastFailure ? new Date(circuit.lastFailure).toISOString() : null, failure_threshold: circuit.failureThreshold, reset_timeout_ms: circuit.resetTimeoutMs, success_threshold: circuit.successThreshold }, cached_health: cachedHealth, cache_age_seconds: cacheTime ? Math.floor((Date.now() - cacheTime) / 1000) : null }); });
 app.get('/api/self-heal/circuit/reset', function(req, res) { circuit.state = 'CLOSED'; circuit.failures = 0; circuit.halfOpenSuccesses = 0; res.json({ circuit: 'reset', new_state: 'CLOSED' }); });
+
+/* ===== 404 HANDLER ===== */
+app.use(function(req, res) {
+  res.status(404).json({ error: 'Not found', request_id: req._requestId || 'unknown' });
+});
 
 /* ===== CRON ===== */
 function setupCron(cl) {
@@ -195,7 +238,7 @@ function setupCron(cl) {
 
 /* ===== START ===== */
 app.listen(PORT, async function() {
-  console.log('TRUNKIA Phase6 on :' + PORT);
+  console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
   try { var cm = await import('node-cron'); setupCron(cm.default || cm); } catch (e) { console.log('[WARN] node-cron not available'); }
 });
