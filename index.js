@@ -10,6 +10,8 @@ function fixDbUrl(u){var p=u.split('?');if(p.length<2)return u;var s=p[1].split(
 
 function getPool(){return new pg.Pool({connectionString:fixDbUrl(process.env.DATABASE_URL),ssl:{rejectUnauthorized:false}});}
 
+function cleanNum(v){return parseInt(String(v).replace(/[^0-9]/g,''))||0;}
+
 app.get('/health', (req, res) => res.json({status:'ok', ready:true, port:PORT}));
 app.get('/ping', (req, res) => res.json({pong:true}));
 
@@ -21,12 +23,14 @@ app.get('/api/intelligence/geopolitical/:slug', async (req, res) => {
 app.get('/api/intelligence/cost-calculate', async (req, res) => {
   var pool=getPool();
   try{
-    var slug=req.query.model||'gpt-4o';var inT=(parseInt(req.query.input)||1000)/1000000;var outT=(parseInt(req.query.output)||500)/1000000;
+    var slug=req.query.model||'gpt-4o';var inT=(cleanNum(req.query.input)||1000)/1000000;var outT=(cleanNum(req.query.output)||500)/1000000;
     var r=await pool.query("SELECT tier_name, price FROM model_pricing_tiers t JOIN models m ON t.model_id=m.id WHERE m.slug=$1 AND t.active=true ORDER BY t.tier_name",[slug]);await pool.end();
-    var inP=r.rows.find(x=>x.tier_name.toLowerCase().includes('input'))||r.rows[0]||{price:0};
-    var outP=r.rows.find(x=>x.tier_name.toLowerCase().includes('output'))||r.rows[1]||{price:0};
-    var cost=(inT*inP.price+outP*outP.price).toFixed(6);
-    res.json({model:slug,input_tokens:req.query.input,output_tokens:req.query.output,cost_per_request:cost,currency:'USD',input_rate:inP.price,output_rate:outP.price,tiers:r.rows.map(x=>x.tier_name)});
+    var inP=r.rows.find(x=>x.tier_name==='input')||{price:'0'};
+    var outP=r.rows.find(x=>x.tier_name==='output')||{price:'0'};
+    var inR=parseFloat(inP.price)||0;
+    var outR=parseFloat(outP.price)||0;
+    var cost=(inT*inR+outT*outR).toFixed(10);
+    res.json({model:slug,input_tokens:inT*1000000,output_tokens:outT*1000000,cost_per_request:cost,currency:'USD',per_1m_input:inR,per_1m_output:outR});
   }catch(e){await pool.end();res.status(500).json({error:e.message});}
 });
 
