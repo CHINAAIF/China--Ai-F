@@ -90,40 +90,44 @@ app.post('/api/inference/cost-estimate', (req, res) => {
 
 app.post('/api/inference/chat', async (req, res) => {
   try {
-    const { message, model: userChoice } = req.body;
+    const { message } = req.body;
     if (!message || typeof message !== 'string' || message.length > 50000) {
       return res.status(400).json({ success: false, error: 'Invalid message' });
     }
     const startTime = Date.now();
+    
+    // 1. Sanitize Input
     const { sanitized, flags } = sanitizeInput(message);
     
-    // Cognitive Defense: Analyze with Python Sidecar
-    const messages = [{ role: 'user', content: sanitized }];
-    const safetyCheck = await analyzeWithPythonSidecar(messages);
-    
+    // 2. Cognitive Defense (Native Shield)
+    const safetyCheck = analyzePromptLocally(sanitized);
     if (safetyCheck.action === 'block') {
-      console.log('[SECURITY] Prompt blocked by Sidecar:', JSON.stringify(safetyCheck.scores));
-      return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: safetyCheck.reason || 'policy_violation' });
+      console.log('[SECURITY] Prompt blocked by Native Shield:', JSON.stringify(safetyCheck.scores));
+      return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
     }
     
+    // 3. Classify Task
     const taskType = classifyTask(sanitized);
-    const modelName = selectModel(taskType, userChoice);
+    
+    // 4. Execute Inference via Sovereign Router
     const result = await executeInference(sanitized, taskType);
     if (!result.success) {
       return res.status(502).json({ success: false, error: result.error });
     }
-    const cost = { total_cost: (result.tokens_in + result.tokens_out) * 0.000001 };
-    console.log('[INFERENCE]', JSON.stringify({ task_type: taskType, model: modelName, tokens_in: result.tokens_in, tokens_out: result.tokens_out, cost_usd: cost.total_cost.toFixed(6), latency_ms: Date.now() - startTime, pii_flags: flags }));
+    
+    // 5. Log (MLOps)
+    console.log('[INFERENCE]', JSON.stringify({ task_type: taskType, model: result.model_used, tokens_in: result.tokens_in, tokens_out: result.tokens_out, latency_ms: Date.now() - startTime, pii_flags: flags }));
+    
     res.status(200).json({
       success: true,
       content: result.content,
-      model_used: result.model,
+      model_used: result.model_used,
       task_type: taskType,
       tokens: { in: result.tokens_in, out: result.tokens_out },
-      cost_usd: cost.total_cost.toFixed(6),
       latency_ms: Date.now() - startTime,
       pii_flags: flags
     });
+
   } catch (err) {
     console.error('[CHAT_ERROR]', err.message);
     res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
