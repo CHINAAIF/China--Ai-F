@@ -11,6 +11,45 @@ import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 var app = express();
+var PORT = process.env.PORT || 8080;
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
+var START_TIME = Date.now();
+var LAST_SYNC = null;
+var cronJobs = {};
+var cronStats = {};
+var requestCounter = 0;
+
+/* ===== SECURITY: Helmet ===== */
+app.use(helmet({
+  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"] } },
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
+}));
+
+/* ===== SECURITY: CORS ===== */
+app.use(cors({
+  origin: function(origin, callback) {
+    var allowed = (process.env.CORS_ORIGINS || '*').split(',').map(function(s) { return s.trim(); });
+    if (allowed.indexOf('*') !== -1 || !origin || allowed.indexOf(origin) !== -1) { callback(null, true); }
+    else { callback(new Error('CORS blocked')); }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  maxAge: 86400
+}));
+
+/* ===== SECURITY: Rate Limiting ===== */
+var globalLimiter = rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Rate limit exceeded', retry_after: 60 } });
+app.use('/api/', globalLimiter);
+
+var strictLimiter = rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Strict rate limit exceeded', retry_after: 60 } });
+app.use('/api/self-heal/', strictLimiter);
+app.use('/api/scheduler/trigger/', strictLimiter);
+
+/* ===== SECURITY: Body Size ===== */
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 // ═══════════════════════════════════════════════════════════
 // INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
@@ -81,45 +120,6 @@ app.post('/api/inference/chat', async (req, res) => {
 });
 // END INFERENCE
 
-var PORT = process.env.PORT || 8080;
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
-var START_TIME = Date.now();
-var LAST_SYNC = null;
-var cronJobs = {};
-var cronStats = {};
-var requestCounter = 0;
-
-/* ===== SECURITY: Helmet ===== */
-app.use(helmet({
-  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"] } },
-  crossOriginEmbedderPolicy: false,
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
-}));
-
-/* ===== SECURITY: CORS ===== */
-app.use(cors({
-  origin: function(origin, callback) {
-    var allowed = (process.env.CORS_ORIGINS || '*').split(',').map(function(s) { return s.trim(); });
-    if (allowed.indexOf('*') !== -1 || !origin || allowed.indexOf(origin) !== -1) { callback(null, true); }
-    else { callback(new Error('CORS blocked')); }
-  },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-  maxAge: 86400
-}));
-
-/* ===== SECURITY: Rate Limiting ===== */
-var globalLimiter = rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Rate limit exceeded', retry_after: 60 } });
-app.use('/api/', globalLimiter);
-
-var strictLimiter = rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Strict rate limit exceeded', retry_after: 60 } });
-app.use('/api/self-heal/', strictLimiter);
-app.use('/api/scheduler/trigger/', strictLimiter);
-
-/* ===== SECURITY: Body Size ===== */
-app.use(express.json({ limit: '100kb' }));
-app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 /* ===== CIRCUIT BREAKER ===== */
 var circuit = { state: 'CLOSED', failures: 0, lastFailure: 0, successThreshold: 3, failureThreshold: 5, resetTimeoutMs: 30000, halfOpenSuccesses: 0 };
