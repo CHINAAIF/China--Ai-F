@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 var app = express();
+app.set('trust proxy', 1);
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
