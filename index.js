@@ -1,4 +1,4 @@
-import { sanitizeInput, estimateTokens, classifyTask, selectModel, callGroq, estimateCost } from './lib/inference.js';
+import { sanitizeInput, estimateTokens, classifyTask, selectModel, callGroq, estimateCost, analyzeWithPythonSidecar } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
 import dotenv from 'dotenv';
@@ -95,6 +95,16 @@ app.post('/api/inference/chat', async (req, res) => {
     }
     const startTime = Date.now();
     const { sanitized, flags } = sanitizeInput(message);
+    
+    // Cognitive Defense: Analyze with Python Sidecar
+    const messages = [{ role: 'user', content: sanitized }];
+    const safetyCheck = await analyzeWithPythonSidecar(messages);
+    
+    if (safetyCheck.action === 'block') {
+      console.log('[SECURITY] Prompt blocked by Sidecar:', JSON.stringify(safetyCheck.scores));
+      return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: safetyCheck.reason || 'policy_violation' });
+    }
+    
     const taskType = classifyTask(sanitized);
     const modelName = selectModel(taskType, userChoice);
     const result = await callGroq(sanitized, null, modelName);
