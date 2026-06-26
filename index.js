@@ -306,78 +306,7 @@ app.post('/api/inference/chat', async (req, res) => {
     res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
   }
 });
-
-
-
-// ═══════════════════════════════════════════════════════════
-// INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
-// ═══════════════════════════════════════════════════════════
-app.get('/api/inference/models', (req, res) => {
-  try {
-    const models = [
-      { id: 'llama-3.3-70b-versatile', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'advanced' },
-      { id: 'llama-3.1-8b-instant', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'fast' }
-    ];
-    res.status(200).json({ success: true, models });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-
-app.post('/api/inference/cost-estimate', (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ success: false, error: 'Message is required' });
-    }
-    const { sanitized } = sanitizeInput(message);
-    const tokensIn = estimateTokens(sanitized);
-    const estimatedTokensOut = 500;
-    const cost = estimateCost(tokensIn, estimatedTokensOut, 'llama-3.3-70b-versatile');
-    res.status(200).json({
-      success: true,
-      estimated_input_tokens: tokensIn,
-      estimated_output_tokens: estimatedTokensOut,
-      estimated_cost_usd: cost.total_cost.toFixed(6)
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-
-app.post('/api/inference/chat', async (req, res) => {
-  try {
-    const { message, model: userChoice } = req.body;
-    if (!message || typeof message !== 'string' || message.length > 50000) {
-      return res.status(400).json({ success: false, error: 'Invalid message' });
-    }
-    const startTime = Date.now();
-    const { sanitized, flags } = sanitizeInput(message);
-    const taskType = classifyTask(sanitized);
-    const modelName = selectModel(taskType, userChoice);
-    const result = await callGroq(sanitized, null, modelName);
-    if (!result.success) {
-      return res.status(502).json({ success: false, error: result.error });
-    }
-    const cost = estimateCost(result.tokens_in, result.tokens_out, modelName);
-    console.log('[INFERENCE]', JSON.stringify({ task_type: taskType, model: modelName, tokens_in: result.tokens_in, tokens_out: result.tokens_out, cost_usd: cost.total_cost.toFixed(6), latency_ms: Date.now() - startTime, pii_flags: flags }));
-    res.status(200).json({
-      success: true,
-      content: result.content,
-      model_used: result.model,
-      task_type: taskType,
-      tokens: { in: result.tokens_in, out: result.tokens_out },
-      cost_usd: cost.total_cost.toFixed(6),
-      latency_ms: Date.now() - startTime,
-      pii_flags: flags
-    });
-  } catch (err) {
-    console.error('[CHAT_ERROR]', err.message);
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
 // END INFERENCE
-
 
 app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
