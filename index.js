@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { pool } from './lib/db.js';
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
 import './lib/cognitive-optimizer.mjs';
+import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
@@ -94,6 +95,15 @@ app.post('/api/inference/cost-estimate', (req, res) => {
 
 app.post('/api/inference/chat', async (req, res) => {
   try {
+    // 0. Sovereign IAM & Financial Shield
+    const rawApiKey = req.headers['x-api-key'] || (req.headers['authorization'] || '').replace('Bearer ', '');
+    let authContext;
+    try {
+      authContext = await validateApiKeyAndQuota(rawApiKey);
+    } catch (authErr) {
+      return res.status(authErr.code || 401).json({ success: false, error: authErr.message, details: authErr.spent ? { spent: authErr.spent, limit: authErr.limit } : undefined });
+    }
+
     const { message, session_id } = req.body;
     if (!message || typeof message !== 'string' || message.length > 50000) {
       return res.status(400).json({ success: false, error: 'Invalid message' });
@@ -485,6 +495,28 @@ app.post('/internal/intel/ingest', async (req, res) => {
   } catch (err) {
     console.error('[QUARANTINE_ERROR]', err.message);
     res.status(500).json({ status: 'error', reason: 'internal_error' });
+  }
+});
+
+
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN ENDPOINT: Generate Sovereign API Key
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
+  try {
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+    }
+    
+    const { user_id, daily_limit } = req.body;
+    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+    
+    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
+    res.status(201).json({ success: true, api_key: newKey, message: 'Keep this key secure. It will not be shown again.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
   }
 });
 
