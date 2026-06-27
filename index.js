@@ -1,3 +1,26 @@
+
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN ENDPOINT: Generate Sovereign API Key
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
+  try {
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+    }
+    
+    const { user_id, daily_limit } = req.body;
+    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+    
+    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
+    res.status(201).json({ success: true, api_key: newKey, message: 'Keep this key secure.' });
+  } catch (err) {
+    console.error('[ADMIN_KEYGEN_ERR]', err.message);
+    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
 import crypto from 'crypto';
 import { pool } from './lib/db.js';
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
@@ -499,26 +522,6 @@ app.post('/internal/intel/ingest', async (req, res) => {
 });
 
 
-
-// ═══════════════════════════════════════════════════════════
-// ADMIN ENDPOINT: Generate Sovereign API Key
-// ═══════════════════════════════════════════════════════════
-app.post('/api/admin/generate-key', async (req, res) => {
-  try {
-    const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== process.env.ADMIN_SECRET) {
-      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
-    }
-    
-    const { user_id, daily_limit } = req.body;
-    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
-    
-    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
-    res.status(201).json({ success: true, api_key: newKey, message: 'Keep this key secure. It will not be shown again.' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
 
 
 app.listen(PORT, async function() {
