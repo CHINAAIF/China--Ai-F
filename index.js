@@ -16,6 +16,19 @@ import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 var app = express();
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
+  try {
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+    }
+    const { user_id, daily_limit } = req.body;
+    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
+    res.status(201).json({ success: true, api_key: newKey });
+  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
+});
 app.set('trust proxy', 1);
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
@@ -245,19 +258,6 @@ function setupCron(cl) {
 
 // ═══════════════════════════════════════════════════════════
 // ADMIN ENDPOINT: Generate Sovereign API Key
-// ═══════════════════════════════════════════════════════════
-app.post('/api/admin/generate-key', async (req, res) => {
-  try {
-    const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
-      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
-    }
-    const { user_id, daily_limit } = req.body;
-    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
-    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
-    res.status(201).json({ success: true, api_key: newKey });
-  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
-});
 
 // ═══════════════════════════════════════════════════════════
 // INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
