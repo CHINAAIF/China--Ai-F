@@ -1,4 +1,4 @@
-import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally } from './lib/inference.js';
+import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
 import dotenv from 'dotenv';
@@ -115,16 +115,29 @@ app.post('/api/inference/chat', async (req, res) => {
       return res.status(502).json({ success: false, error: result.error });
     }
     
-    // 5. Log (MLOps)
-    console.log('[INFERENCE]', JSON.stringify({ task_type: taskType, model: result.model_used, tokens_in: result.tokens_in, tokens_out: result.tokens_out, latency_ms: Date.now() - startTime, pii_flags: flags }));
+    // 5. Output Guard (Sanitize AI response)
+    const safeContent = sanitizeOutput(result.content);
+    
+    // 6. Metrics Calculation
+    const latency_ms = Date.now() - startTime;
+    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001; // Placeholder price
+    const request_hash = crypto.createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
+    
+    // 7. Async DB Logging (Fire and forget)
+    logInferenceAsync({
+      request_hash, task_type: taskType, model_used: result.model_used,
+      latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out,
+      cost_usd, outcome: 'success'
+    }).catch(err => console.error('[ASYNC_LOG_ERR]', err.message));
     
     res.status(200).json({
       success: true,
-      content: result.content,
+      content: safeContent,
       model_used: result.model_used,
       task_type: taskType,
       tokens: { in: result.tokens_in, out: result.tokens_out },
-      latency_ms: Date.now() - startTime,
+      cost_usd: cost_usd.toFixed(6),
+      latency_ms: latency_ms,
       pii_flags: flags
     });
 
