@@ -237,12 +237,12 @@ function fixDbUrl(url) {
   for (var i = 0; i < params.length; i++) { if (params[i].indexOf('channel_binding=') !== 0) filtered.push(params[i]); }
   return parts[0] + '?' + filtered.join('&');
 }
-var pool = null;
+
 function getPool() {
   if (!pool) {
     var dbUrl = fixDbUrl(process.env.DATABASE_URL);
     if (!dbUrl) throw new Error('DATABASE_URL is not set');
-    pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+
     pool.on('error', function(err) { console.error('[POOL ERROR]', err.message); circuitRecordFailure(); });
   }
   return pool;
