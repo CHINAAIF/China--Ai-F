@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
