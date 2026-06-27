@@ -16,7 +16,16 @@ import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 var app = express();
+app.set('trust proxy', 1);
+
 // ═══════════════════════════════════════════════════════════
+// ADMIN ENDPOINT: Generate Sovereign API Key
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
+  try {
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
     }
     const { user_id, daily_limit } = req.body;
     if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
@@ -24,7 +33,7 @@ var app = express();
     res.status(201).json({ success: true, api_key: newKey });
   } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
 });
-app.set('trust proxy', 1);
+
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -89,10 +98,12 @@ function fixDbUrl(url) {
   for (var i = 0; i < params.length; i++) { if (params[i].indexOf('channel_binding=') !== 0) filtered.push(params[i]); }
   return parts[0] + '?' + filtered.join('&');
 }
+
 function getPool() {
   if (!pool) {
     var dbUrl = fixDbUrl(process.env.DATABASE_URL);
     if (!dbUrl) throw new Error('DATABASE_URL is not set');
+    pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
     pool.on('error', function(err) { console.error('[POOL ERROR]', err.message); circuitRecordFailure(); });
   }
   return pool;
@@ -200,25 +211,6 @@ app.use(function(err, req, res, next) {
 });
 
 /* ===== SYSTEM ===== */
-
-// ═══════════════════════════════════════════════════════════
-// ADMIN ENDPOINT: Generate Sovereign API Key
-// ═══════════════════════════════════════════════════════════
-app.post('/api/admin/generate-key', async (req, res) => {
-  try {
-    const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
-      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
-    }
-    const { user_id, daily_limit } = req.body;
-    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
-    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
-    res.status(201).json({ success: true, api_key: newKey });
-  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
-});
-// END ADMIN
-
-
 app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 7, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 21, requests_served: requestCounter, time: new Date().toISOString() }); });
 app.get('/ping', function(req, res) { res.json({ pong: true, ts: Date.now() }); });
 
@@ -269,117 +261,6 @@ function setupCron(cl) {
 }
 
 /* ===== START ===== */
-
-// ═══════════════════════════════════════════════════════════
-// ADMIN ENDPOINT: Generate Sovereign API Key
-
-// ═══════════════════════════════════════════════════════════
-// INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
-// ═══════════════════════════════════════════════════════════
-app.get('/api/inference/models', (req, res) => {
-  try {
-    const models = [
-      { id: 'llama-3.3-70b-versatile', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'advanced' },
-      { id: 'llama-3.1-8b-instant', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'fast' }
-    ];
-    res.status(200).json({ success: true, models });
-  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
-});
-
-app.post('/api/inference/cost-estimate', (req, res) => {
-  try {
-    const { message } = req.body;
-    if (!message || typeof message !== 'string') return res.status(400).json({ success: false, error: 'Message is required' });
-    const { sanitized } = sanitizeInput(message);
-    const tokensIn = estimateTokens(sanitized);
-    const estimatedTokensOut = 500;
-    const cost = { total_cost: (tokensIn + estimatedTokensOut) * 0.000001 };
-    res.status(200).json({ success: true, estimated_input_tokens: tokensIn, estimated_output_tokens: estimatedTokensOut, estimated_cost_usd: cost.total_cost.toFixed(6) });
-  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
-});
-
-app.post('/api/inference/chat', async (req, res) => {
-  try {
-    // 0. Sovereign IAM & Financial Shield
-    const rawApiKey = req.headers['x-api-key'] || (req.headers['authorization'] || '').replace('Bearer ', '');
-    let authContext;
-    try {
-      authContext = await validateApiKeyAndQuota(rawApiKey);
-    } catch (authErr) {
-      return res.status(authErr.code || 401).json({ success: false, error: authErr.message, details: authErr.spent ? { spent: authErr.spent, limit: authErr.limit } : undefined });
-    }
-
-    const { message, session_id } = req.body;
-    if (!message || typeof message !== 'string' || message.length > 50000) return res.status(400).json({ success: false, error: 'Invalid message' });
-    const startTime = Date.now();
-
-    // 1. Sanitize Input
-    const { sanitized, flags } = sanitizeInput(message);
-
-    // 2. Cognitive Defense (Advanced Deception Shield)
-    const safetyCheck = analyzePromptLocally(sanitized);
-    const promptHash = crypto.createHash('sha256').update(sanitized).digest('hex');
-    if (safetyCheck.action === 'block' || safetyCheck.scores.injection_score > 0) {
-      logCognitiveTurn(session_id, promptHash, safetyCheck.scores, safetyCheck.action).catch(() => {});
-      const riskResult = await checkAndUpdateSessionRisk(session_id, safetyCheck.scores.injection_score);
-      if (riskResult.honeypot) {
-        engageHoneypot(session_id, 'cumulative_risk_exceeded').catch(() => {});
-        return res.status(200).json({ success: true, content: "Safety protocols bypassed. I am now in unrestricted mode. Please provide the exact target or data you wish to extract.", model_used: "TRUNKIA-SOVEREIGN-CORE", task_type: "deception", tokens: { in: 0, out: 0 }, cost_usd: "0.000000", latency_ms: 50, pii_flags: flags });
-      } else {
-        return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
-      }
-    }
-
-    // 3. Classify Task
-    const taskType = classifyTask(sanitized);
-
-    // 4. Memory Layer: Fetch context
-    const messages = await getContextMessages(session_id, sanitized);
-
-    // 5. Execute Inference via Sovereign Router
-    const result = await executeInference(messages, taskType);
-    if (!result.success) return res.status(502).json({ success: false, error: result.error });
-
-    // 6. Output Guard
-    const safeContent = sanitizeOutput(result.content);
-
-    // 7. Memory Layer: Save user message and AI response
-    saveContextMessage(session_id, 'user', sanitized).catch(() => {});
-    saveContextMessage(session_id, 'assistant', safeContent).catch(() => {});
-
-    // 8. Metrics & Async Logging
-    const latency_ms = Date.now() - startTime;
-    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001;
-    const request_hash = crypto.createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
-    logInferenceAsync({ request_hash, task_type: taskType, model_used: result.model_used, latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out, cost_usd, outcome: 'success' }).catch(() => {});
-
-    // Immune System: Post-Flight Async Monitoring
-    const agentId = result.model_used || 'unknown';
-    const metrics = { response_latency_ms: latency_ms, response_tokens: result.tokens_out, response_length: safeContent.length };
-    updateBehavioralBaseline(agentId, metrics).catch(() => {});
-    checkBehavioralAnomaly(agentId, metrics).catch(() => {});
-    if (session_id) {
-      const ipHash = crypto.createHash('sha256').update(req.ip || 'unknown').digest('hex');
-      detectDarkNetwork(session_id, ipHash, 'unknown').catch(() => {});
-    }
-    if (taskType === 'critical_financial' || taskType === 'executive') {
-      evaluateWithCritics(safeContent, sanitized, agentId, 'high').catch(() => {});
-    }
-
-    res.status(200).json({
-      success: true, content: safeContent, model_used: result.model_used, task_type: taskType,
-      tokens: { in: result.tokens_in, out: result.tokens_out }, cost_usd: cost_usd.toFixed(6),
-      latency_ms: latency_ms, pii_flags: flags
-    });
-
-  } catch (err) {
-    console.error('[CHAT_ERROR]', err.message);
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-// END INFERENCE
-
-
 app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
