@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { pool } from './lib/db.js';
+import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
@@ -163,6 +164,35 @@ app.post('/api/inference/chat', async (req, res) => {
       latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out,
       cost_usd, outcome: 'success'
     }).catch(() => {});
+    
+    // Immune System: Post-Flight Async Monitoring
+    const agentId = result.model_used || 'unknown';
+    const metrics = {
+      response_latency_ms: latency_ms,
+      response_tokens: result.tokens_out,
+      response_length: safeContent.length
+    };
+    
+    // Update behavioral baseline (async)
+    updateBehavioralBaseline(agentId, metrics).catch(() => {});
+    
+    // Check for anomalies (async)
+    checkBehavioralAnomaly(agentId, metrics).then(anomaly => {
+      if (anomaly.anomaly) {
+        console.warn('[IMMUNE_ALERT] Anomaly detected for ' + agentId + ':', anomaly);
+      }
+    }).catch(() => {});
+    
+    // Dark network detection (async, only if session_id exists)
+    if (session_id) {
+      const ipHash = crypto.createHash('sha256').update(req.ip || 'unknown').digest('hex');
+      detectDarkNetwork(session_id, ipHash, 'unknown').catch(() => {});
+    }
+    
+    // Tiered critic evaluation (only for high-risk tasks)
+    if (taskType === 'critical_financial' || taskType === 'executive') {
+      evaluateWithCritics(safeContent, sanitized, agentId, 'high').catch(() => {});
+    }
     
     res.status(200).json({
       success: true,
