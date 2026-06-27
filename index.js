@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { pool } from './lib/db.js';
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
+import './lib/cognitive-optimizer.mjs';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
