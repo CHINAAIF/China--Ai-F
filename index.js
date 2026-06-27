@@ -17,11 +17,6 @@ dotenv.config();
 
 var app = express();
 // ═══════════════════════════════════════════════════════════
-app.post('/api/admin/generate-key', async (req, res) => {
-  try {
-    const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
-      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
     }
     const { user_id, daily_limit } = req.body;
     if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
@@ -205,6 +200,25 @@ app.use(function(err, req, res, next) {
 });
 
 /* ===== SYSTEM ===== */
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN ENDPOINT: Generate Sovereign API Key
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
+  try {
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+    }
+    const { user_id, daily_limit } = req.body;
+    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
+    res.status(201).json({ success: true, api_key: newKey });
+  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
+});
+// END ADMIN
+
+
 app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 7, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 21, requests_served: requestCounter, time: new Date().toISOString() }); });
 app.get('/ping', function(req, res) { res.json({ pong: true, ts: Date.now() }); });
 
