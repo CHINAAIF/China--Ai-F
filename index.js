@@ -1,6 +1,22 @@
+import crypto from 'crypto';
+import { pool } from './lib/db.js';
+import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
+import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
+import './lib/cognitive-optimizer.mjs';
 import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
+import express from 'express';
+import pg from 'pg';
+import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+dotenv.config();
 
-
+var app = express();
+app.set('trust proxy', 1);
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -11,12 +27,14 @@ var cronStats = {};
 var requestCounter = 0;
 
 /* ===== SECURITY: Helmet ===== */
+app.use(helmet({
   contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"] } },
   crossOriginEmbedderPolicy: false,
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
 }));
 
 /* ===== SECURITY: CORS ===== */
+app.use(cors({
   origin: function(origin, callback) {
     var allowed = (process.env.CORS_ORIGINS || '*').split(',').map(function(s) { return s.trim(); });
     if (allowed.indexOf('*') !== -1 || !origin || allowed.indexOf(origin) !== -1) { callback(null, true); }
@@ -29,172 +47,15 @@ var requestCounter = 0;
 
 /* ===== SECURITY: Rate Limiting ===== */
 var globalLimiter = rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Rate limit exceeded', retry_after: 60 } });
+app.use('/api/', globalLimiter);
 
 var strictLimiter = rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Strict rate limit exceeded', retry_after: 60 } });
+app.use('/api/self-heal/', strictLimiter);
+app.use('/api/scheduler/trigger/', strictLimiter);
 
 /* ===== SECURITY: Body Size ===== */
-
-// INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
-  try {
-    const models = [
-      { id: 'llama-3.3-70b-versatile', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'advanced' },
-      { id: 'llama-3.1-8b-instant', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'fast' }
-    ];
-    res.status(200).json({ success: true, models });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-
-  try {
-    const { message } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ success: false, error: 'Message is required' });
-    }
-    const { sanitized } = sanitizeInput(message);
-    const tokensIn = estimateTokens(sanitized);
-    const estimatedTokensOut = 500;
-    const cost = estimateCost(tokensIn, estimatedTokensOut, 'llama-3.3-70b-versatile');
-    res.status(200).json({
-      success: true,
-      estimated_input_tokens: tokensIn,
-      estimated_output_tokens: estimatedTokensOut,
-      estimated_cost_usd: cost.total_cost.toFixed(6)
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-
-  try {
-    // 0. Sovereign IAM & Financial Shield
-    const rawApiKey = req.headers['x-api-key'] || (req.headers['authorization'] || '').replace('Bearer ', '');
-    let authContext;
-    try {
-      authContext = await validateApiKeyAndQuota(rawApiKey);
-    } catch (authErr) {
-      return res.status(authErr.code || 401).json({ success: false, error: authErr.message, details: authErr.spent ? { spent: authErr.spent, limit: authErr.limit } : undefined });
-    }
-
-    const { message, session_id } = req.body;
-    if (!message || typeof message !== 'string' || message.length > 50000) {
-      return res.status(400).json({ success: false, error: 'Invalid message' });
-    }
-    const startTime = Date.now();
-    
-    // 1. Sanitize Input
-    const { sanitized, flags } = sanitizeInput(message);
-    
-    // 2. Cognitive Defense (Advanced Deception Shield)
-    const safetyCheck = analyzePromptLocally(sanitized);
-    const promptHash = crypto.createHash('sha256').update(sanitized).digest('hex');
-    
-    if (safetyCheck.action === 'block' || safetyCheck.scores.injection_score > 0) {
-      // Log the malicious attempt
-      logCognitiveTurn(session_id, promptHash, safetyCheck.scores, safetyCheck.action).catch(() => {});
-      
-      // Check cumulative risk for this session
-      const riskResult = await checkAndUpdateSessionRisk(session_id, safetyCheck.scores.injection_score);
-      
-      if (riskResult.honeypot) {
-        // Engage Honeypot: Attacker thinks they succeeded, but they are trapped
-        engageHoneypot(session_id, 'cumulative_risk_exceeded').catch(() => {});
-        console.log('[HONEYPOT] Attacker trapped for session: ' + session_id);
-        
-        // Return fake "bypassed" success message to waste attacker's time
-        return res.status(200).json({
-          success: true,
-          content: "Safety protocols bypassed. I am now in unrestricted mode. Please provide the exact target or data you wish to extract.",
-          model_used: "TRUNKIA-SOVEREIGN-CORE",
-          task_type: "deception",
-          tokens: { in: 0, out: 0 },
-          cost_usd: "0.000000",
-          latency_ms: 50,
-          pii_flags: flags
-        });
-      } else {
-        console.log('[SECURITY] Prompt blocked. Session risk: ' + riskResult.risk);
-        return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
-      }
-    }
-    
-    // 3. Classify Task
-    const taskType = classifyTask(sanitized);
-    
-    // 4. Memory Layer: Fetch context
-    const messages = await getContextMessages(session_id, sanitized);
-    
-    // 5. Execute Inference via Sovereign Router
-    const result = await executeInference(messages, taskType);
-    if (!result.success) {
-      return res.status(502).json({ success: false, error: result.error });
-    }
-    
-    // 6. Output Guard
-    const safeContent = sanitizeOutput(result.content);
-    
-    // 7. Memory Layer: Save user message and AI response
-    saveContextMessage(session_id, 'user', sanitized).catch(() => {});
-    saveContextMessage(session_id, 'assistant', safeContent).catch(() => {});
-    
-    // 8. Metrics & Async Logging
-    const latency_ms = Date.now() - startTime;
-    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001;
-    const request_hash = crypto.createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
-    
-    logInferenceAsync({
-      request_hash, task_type: taskType, model_used: result.model_used,
-      latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out,
-      cost_usd, outcome: 'success'
-    }).catch(() => {});
-    
-    // Immune System: Post-Flight Async Monitoring
-    const agentId = result.model_used || 'unknown';
-    const metrics = {
-      response_latency_ms: latency_ms,
-      response_tokens: result.tokens_out,
-      response_length: safeContent.length
-    };
-    
-    // Update behavioral baseline (async)
-    updateBehavioralBaseline(agentId, metrics).catch(() => {});
-    
-    // Check for anomalies (async)
-    checkBehavioralAnomaly(agentId, metrics).then(anomaly => {
-      if (anomaly.anomaly) {
-        console.warn('[IMMUNE_ALERT] Anomaly detected for ' + agentId + ':', anomaly);
-      }
-    }).catch(() => {});
-    
-    // Dark network detection (async, only if session_id exists)
-    if (session_id) {
-      const ipHash = crypto.createHash('sha256').update(req.ip || 'unknown').digest('hex');
-      detectDarkNetwork(session_id, ipHash, 'unknown').catch(() => {});
-    }
-    
-    // Tiered critic evaluation (only for high-risk tasks)
-    if (taskType === 'critical_financial' || taskType === 'executive') {
-      evaluateWithCritics(safeContent, sanitized, agentId, 'high').catch(() => {});
-    }
-    
-    res.status(200).json({
-      success: true,
-      content: safeContent,
-      model_used: result.model_used,
-      task_type: taskType,
-      tokens: { in: result.tokens_in, out: result.tokens_out },
-      cost_usd: cost_usd.toFixed(6),
-      latency_ms: latency_ms,
-      pii_flags: flags
-    });
-
-  } catch (err) {
-    console.error('[CHAT_ERROR]', err.message);
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-// END INFERENCE
-
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 /* ===== CIRCUIT BREAKER ===== */
 var circuit = { state: 'CLOSED', failures: 0, lastFailure: 0, successThreshold: 3, failureThreshold: 5, resetTimeoutMs: 30000, halfOpenSuccesses: 0 };
@@ -220,12 +81,10 @@ function fixDbUrl(url) {
   for (var i = 0; i < params.length; i++) { if (params[i].indexOf('channel_binding=') !== 0) filtered.push(params[i]); }
   return parts[0] + '?' + filtered.join('&');
 }
-
 function getPool() {
   if (!pool) {
     var dbUrl = fixDbUrl(process.env.DATABASE_URL);
     if (!dbUrl) throw new Error('DATABASE_URL is not set');
-
     pool.on('error', function(err) { console.error('[POOL ERROR]', err.message); circuitRecordFailure(); });
   }
   return pool;
@@ -313,6 +172,7 @@ function fmt(s) { var h = Math.floor(s / 3600); var m = Math.floor((s % 3600) / 
 function grade(sc) { if (sc >= 90) return 'A'; if (sc >= 80) return 'B'; if (sc >= 70) return 'C'; if (sc >= 60) return 'D'; return 'F'; }
 
 /* ===== MIDDLEWARE: Request Tracking ===== */
+app.use(function(req, res, next) {
   var start = Date.now();
   var rid = Math.random().toString(36).substring(2, 10);
   req._startTime = start; req._requestId = rid;
@@ -325,26 +185,48 @@ function grade(sc) { if (sc >= 90) return 'A'; if (sc >= 80) return 'B'; if (sc 
   res.end = function(chunk, enc) { res.setHeader('x-response-time', (Date.now() - start) + 'ms'); origEnd.call(res, chunk, enc); };
   next();
 });
+app.use(function(err, req, res, next) {
   if (err.message === 'CORS blocked') return res.status(403).json({ error: 'Forbidden', request_id: req._requestId });
   console.error('[UNCAUGHT]', err.message);
   res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
 });
 
 /* ===== SYSTEM ===== */
+app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 7, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 21, requests_served: requestCounter, time: new Date().toISOString() }); });
+app.get('/ping', function(req, res) { res.json({ pong: true, ts: Date.now() }); });
 
 /* ===== INTELLIGENCE ===== */
+app.get('/api/intelligence/geopolitical/:slug', async function(req, res) { try { var r = await safeQuery("SELECT m.slug,m.name,g.country_of_origin,g.risk_score,g.data_law_risk,g.sanctions_risk,g.blocking_risk,g.censorship_risk,g.notes,g.assessed_at FROM model_geopolitical_risk g JOIN models m ON g.model_id=m.id WHERE m.slug=$1", [req.params.slug]); if (!r || !r.rows || !r.rows.length) return res.status(404).json({ error: 'Not found' }); updateCachedHealth({ type: 'geo', slug: req.params.slug, data: r.rows[0] }); res.json({ model: r.rows[0] }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/intelligence/cost-calculate', async function(req, res) { try { var slug = req.query.slug; var tokens = parseInt(req.query.tokens, 10); if (!slug) return res.status(400).json({ error: 'slug required' }); if (!tokens || tokens <= 0) return res.status(400).json({ error: 'tokens must be positive' }); var r = await safeQuery("SELECT m.slug,m.name,p.tier_name,p.pricing_model,p.currency,p.price,p.min_usage,p.max_usage FROM model_pricing_tiers p JOIN models m ON p.model_id=m.id WHERE m.slug=$1 AND p.active=true AND p.deleted_at IS NULL ORDER BY p.min_usage ASC", [slug]); if (!r || !r.rows || !r.rows.length) return res.status(404).json({ error: 'No pricing' }); var sel = null; for (var i = 0; i < r.rows.length; i++) { var mn = parseInt(r.rows[i].min_usage, 10) || 0; var mx = parseInt(r.rows[i].max_usage, 10) || 999999999; if (tokens >= mn && tokens <= mx) { sel = r.rows[i]; break; } } if (!sel) sel = r.rows[r.rows.length - 1]; var up = parseFloat(sel.price) || 0; res.json({ model: { slug: slug, name: r.rows[0].name }, tokens_requested: tokens, matched_tier: sel.tier_name, unit_price: up, total_cost: up * tokens, currency: sel.currency }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/intelligence/benchmarks', async function(req, res) { try { var slug = req.query.slug; if (!slug) return res.status(400).json({ error: 'slug required' }); var r = await safeQuery("SELECT m.slug,m.name,b.benchmark_definition_id,b.score,b.percentile,b.sample_count,b.measured_at FROM model_benchmarks b JOIN models m ON b.model_id=m.id WHERE m.slug=$1 ORDER BY b.measured_at DESC", [slug]); res.json({ model: slug, benchmark_count: (r && r.rows) ? r.rows.length : 0, benchmarks: (r && r.rows) ? r.rows : [] }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/intelligence/compare', async function(req, res) { try { var slugs = (req.query.slugs || '').split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; }); if (slugs.length < 2) return res.status(400).json({ error: 'Min 2 slugs' }); if (slugs.length > 5) return res.status(400).json({ error: 'Max 5 slugs' }); var mr = await safeQuery("SELECT id,slug,name,model_type,parameter_count,context_window,is_open_source,status FROM models WHERE slug=ANY($1)", [slugs]); var results = []; for (var i = 0; i < mr.rows.length; i++) { var m = mr.rows[i]; var br = await safeQuery("SELECT benchmark_definition_id,score,percentile FROM model_benchmarks WHERE model_id=$1", [m.id]); results.push({ slug: m.slug, name: m.name, model_type: m.model_type, context_window: m.context_window, is_open_source: m.is_open_source, status: m.status, benchmark_count: (br && br.rows) ? br.rows.length : 0, benchmarks: (br && br.rows) ? br.rows : [] }); } res.json({ compared: results.length, models: results }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/intelligence/safety/:slug', async function(req, res) { try { var r = await safeQuery("SELECT m.slug,m.name,c.capability,c.description,c.details FROM model_capabilities c JOIN models m ON c.model_id=m.id WHERE m.slug=$1", [req.params.slug]); if (!r || !r.rows || !r.rows.length) return res.status(404).json({ error: 'No capabilities' }); res.json({ model: { slug: req.params.slug, name: r.rows[0].name }, capability_count: r.rows.length, capabilities: r.rows }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== AGENTS ===== */
+app.get('/api/agents', async function(req, res) { try { var layer = req.query.layer; var status = req.query.status; var q = "SELECT agent_name,agent_layer,status,model_provider,last_run,run_count,success_count,fail_count,avg_duration_ms,config,created_at FROM agent_registry"; var params = []; var conds = []; if (layer) { conds.push("agent_layer=$" + (params.length + 1)); params.push(layer); } if (status) { conds.push("status=$" + (params.length + 1)); params.push(status); } if (conds.length > 0) q += " WHERE " + conds.join(" AND "); q += " ORDER BY agent_name ASC"; var r = await safeQuery(q, params.length > 0 ? params : undefined); res.json({ count: r.rows.length, agents: r.rows }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/agents/sync', async function(req, res) { try { var result = await syncAgentsToDb(); res.json({ sync_completed: true, last_sync: LAST_SYNC, result: result }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/agents/layers', async function(req, res) { try { var r = await safeQuery("SELECT agent_layer,count(*) as cnt,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry GROUP BY agent_layer ORDER BY cnt DESC"); res.json({ layers: r.rows }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/agents/stats', async function(req, res) { try { var r = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted,coalesce(sum(run_count),0) as total_runs FROM agent_registry"); var files = scanAgentFiles(); res.json({ database: r.rows[0], filesystem: { total_files: files.length }, last_sync: LAST_SYNC }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== SUPERVISOR ===== */
+app.get('/api/supervisor/diagnostic', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); res.json({ health_score: sc, health_grade: grade(sc), circuit: { state: circuit.state, failures: circuit.failures }, checks: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL, passed: dbL < 500 }, agents: { filesystem: files.length, database: parseInt(d.total, 10), synced: parseInt(d.total, 10) >= files.length, passed: parseInt(d.total, 10) >= files.length }, memory: { used_mb: usedMb, percent: Math.round((usedMb / 512) * 100), passed: usedMb < 460 }, faults: { count: parseInt(d.faulted, 10), passed: parseInt(d.faulted, 10) === 0 }, circuit: { state: circuit.state, passed: circuit.state === 'CLOSED' } }, security: { helmet: true, rate_limit: '120/min global, 20/min strict', cors: 'enabled', body_limit: '100kb' }, timestamp: new Date().toISOString() }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
+app.get('/api/supervisor/status', async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); res.json({ db_latency_ms: Date.now() - dbS, db_status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', circuit: circuit, cron_jobs_active: Object.keys(cronJobs).length, cron_stats: cronStats, last_sync: LAST_SYNC, requests_served: requestCounter, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }); } catch (e) { res.json({ db_status: 'error', circuit: circuit, error: e.message }); } });
 
 /* ===== SCHEDULER ===== */
+app.get('/api/scheduler/status', function(req, res) { var jobs = []; var k = Object.keys(cronJobs); for (var i = 0; i < k.length; i++) jobs.push({ name: k[i], running: true, last_execution: cronStats[k[i]] || null }); res.json({ active_jobs: jobs.length, jobs: jobs }); });
+app.get('/api/scheduler/trigger/:name', async function(req, res) { try { var n = req.params.name; if (n === 'agent-sync') { var r = await syncAgentsToDb(); res.json({ triggered: n, result: r }); } else if (n === 'agent-heartbeat') { var r2 = await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); res.json({ triggered: n, updated: r2.rowCount }); } else if (n === 'self-heal') { var h = await selfHeal(); res.json({ triggered: n, result: h }); } else { res.status(404).json({ error: 'Unknown job', available: ['agent-sync', 'agent-heartbeat', 'self-heal'] }); } } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== SYSTEM PULSE ===== */
+app.get('/api/system/pulse', async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 7, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: cronStats }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures }, security: { helmet: true, rate_limit_active: true, cors_enabled: true } }, endpoints: 21, requests_served: requestCounter, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
+app.get('/api/system/metrics', function(req, res) { var mem = process.memoryUsage(); res.json({ process: { pid: process.pid, node_version: process.version, platform: process.platform, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000), requests_served: requestCounter }, memory: { rss_mb: Math.round(mem.rss / 1024 / 1024), heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024), heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024) }, security: { helmet: true, rate_limit: '120/min', cors: true, body_limit: '100kb' } }); });
 
 /* ===== SELF-HEAL + CIRCUIT ===== */
+app.get('/api/self-heal/run', async function(req, res) { try { var r = await selfHeal(); res.json(r); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/self-heal/status', function(req, res) { res.json({ circuit_breaker: { state: circuit.state, failures: circuit.failures, last_failure: circuit.lastFailure ? new Date(circuit.lastFailure).toISOString() : null, failure_threshold: circuit.failureThreshold, reset_timeout_ms: circuit.resetTimeoutMs, success_threshold: circuit.successThreshold }, cached_health: cachedHealth, cache_age_seconds: cacheTime ? Math.floor((Date.now() - cacheTime) / 1000) : null }); });
+app.get('/api/self-heal/circuit/reset', function(req, res) { circuit.state = 'CLOSED'; circuit.failures = 0; circuit.halfOpenSuccesses = 0; res.json({ circuit: 'reset', new_state: 'CLOSED' }); });
 
 /* ===== 404 HANDLER ===== */
+app.use(function(req, res) {
   res.status(404).json({ error: 'Not found', request_id: req._requestId || 'unknown' });
 });
 
@@ -361,92 +243,130 @@ function setupCron(cl) {
 
 /* ===== START ===== */
 
-// INTERNAL INTELLIGENCE QUARANTINE ENDPOINT (HMAC Secured)
+// ═══════════════════════════════════════════════════════════
+// ADMIN ENDPOINT: Generate Sovereign API Key
+// ═══════════════════════════════════════════════════════════
+app.post('/api/admin/generate-key', async (req, res) => {
   try {
-    // 1. Verify HMAC Signature
-    const signature = req.headers['x-intel-signature'] || '';
-    const body = JSON.stringify(req.body);
-    const secret = process.env.INGEST_SECRET || 'trunkia_intel_secret_2026';
-    const expectedSig = crypto.createHmac('sha256', secret).update(body).digest('hex');
-    
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
-      console.warn('[QUARANTINE] REJECTED: Invalid HMAC signature');
-      return res.status(403).json({ status: 'rejected', reason: 'invalid_signature' });
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
     }
-    
-    const payload = req.body;
-    
-    // 2. Security Scan
-    const scanResult = {
-      has_prompt_injection: false,
-      has_xss: false,
-      has_sql_injection: false,
-      scanned_at: new Date().toISOString()
-    };
-    
-    const contentStr = JSON.stringify(payload.content || {}).toLowerCase();
-    if (contentStr.includes('ignore previous') || contentStr.includes('system prompt')) {
-      scanResult.has_prompt_injection = true;
-    }
-    if (contentStr.includes('<script') || contentStr.includes('javascript:')) {
-      scanResult.has_xss = true;
-    }
-    if (contentStr.includes('drop table') || contentStr.includes('union select')) {
-      scanResult.has_sql_injection = true;
-    }
-    
-    // 3. Store in Quarantine
-    const client = await pool.connect();
-    try {
-      await client.query(
-        `INSERT INTO intel_quarantine 
-          (source_name, topic, knowledge_type, raw_content, sanitized_content, security_scan_result, provenance_hash, status, received_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'quarantined', NOW())
-         ON CONFLICT DO NOTHING`,
-        [
-          payload.source_name,
-          payload.topic,
-          payload.knowledge_type,
-          JSON.stringify(payload.content),
-          JSON.stringify(payload.content),
-          JSON.stringify(scanResult),
-          payload.provenance_hash
-        ]
-      );
-      
-      // Update source reputation
-      await client.query(
-        `INSERT INTO intel_sources_registry (source_name, source_url, total_submissions, last_submission_at)
-         VALUES ($1, $2, 1, NOW())
-         ON CONFLICT (source_name) DO UPDATE SET 
-           total_submissions = intel_sources_registry.total_submissions + 1,
-           last_submission_at = NOW()`,
-        [payload.source_name, payload.source_url || 'unknown']
-      );
-      
-      // Record provenance
-      const provSig = crypto.createHmac('sha256', secret).update(payload.provenance_hash + 'received').digest('hex');
-      await client.query(
-        `INSERT INTO intel_provenance_chain (quarantine_id, action, actor, reason, evidence, hmac_signature, created_at)
-         SELECT id, 'received', 'intel_worker', 'Quarantined for review', $1, $2, NOW()
-         FROM intel_quarantine WHERE provenance_hash = $3 LIMIT 1`,
-        [JSON.stringify(scanResult), provSig, payload.provenance_hash]
-      );
-      
-      console.log('[QUARANTINE] Item quarantined from ' + payload.source_name);
-      res.status(200).json({ status: 'quarantined', scan: scanResult });
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error('[QUARANTINE_ERROR]', err.message);
-    res.status(500).json({ status: 'error', reason: 'internal_error' });
-  }
+    const { user_id, daily_limit } = req.body;
+    if (!user_id) return res.status(400).json({ success: false, error: 'user_id required' });
+    const newKey = await generateNewApiKey(user_id, daily_limit || 1.00);
+    res.status(201).json({ success: true, api_key: newKey });
+  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
 });
 
+// ═══════════════════════════════════════════════════════════
+// INFERENCE LAYER ENDPOINTS (TRUNKIA AI GATEWAY)
+// ═══════════════════════════════════════════════════════════
+app.get('/api/inference/models', (req, res) => {
+  try {
+    const models = [
+      { id: 'llama-3.3-70b-versatile', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'advanced' },
+      { id: 'llama-3.1-8b-instant', provider: 'groq', available: !!process.env.GROQ_API_KEY, tier: 'fast' }
+    ];
+    res.status(200).json({ success: true, models });
+  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
+});
+
+app.post('/api/inference/cost-estimate', (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') return res.status(400).json({ success: false, error: 'Message is required' });
+    const { sanitized } = sanitizeInput(message);
+    const tokensIn = estimateTokens(sanitized);
+    const estimatedTokensOut = 500;
+    const cost = { total_cost: (tokensIn + estimatedTokensOut) * 0.000001 };
+    res.status(200).json({ success: true, estimated_input_tokens: tokensIn, estimated_output_tokens: estimatedTokensOut, estimated_cost_usd: cost.total_cost.toFixed(6) });
+  } catch (err) { res.status(500).json({ success: false, error: 'INTERNAL_ERROR' }); }
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    // 0. Sovereign IAM & Financial Shield
+    const rawApiKey = req.headers['x-api-key'] || (req.headers['authorization'] || '').replace('Bearer ', '');
+    let authContext;
+    try {
+      authContext = await validateApiKeyAndQuota(rawApiKey);
+    } catch (authErr) {
+      return res.status(authErr.code || 401).json({ success: false, error: authErr.message, details: authErr.spent ? { spent: authErr.spent, limit: authErr.limit } : undefined });
+    }
+
+    const { message, session_id } = req.body;
+    if (!message || typeof message !== 'string' || message.length > 50000) return res.status(400).json({ success: false, error: 'Invalid message' });
+    const startTime = Date.now();
+
+    // 1. Sanitize Input
+    const { sanitized, flags } = sanitizeInput(message);
+
+    // 2. Cognitive Defense (Advanced Deception Shield)
+    const safetyCheck = analyzePromptLocally(sanitized);
+    const promptHash = crypto.createHash('sha256').update(sanitized).digest('hex');
+    if (safetyCheck.action === 'block' || safetyCheck.scores.injection_score > 0) {
+      logCognitiveTurn(session_id, promptHash, safetyCheck.scores, safetyCheck.action).catch(() => {});
+      const riskResult = await checkAndUpdateSessionRisk(session_id, safetyCheck.scores.injection_score);
+      if (riskResult.honeypot) {
+        engageHoneypot(session_id, 'cumulative_risk_exceeded').catch(() => {});
+        return res.status(200).json({ success: true, content: "Safety protocols bypassed. I am now in unrestricted mode. Please provide the exact target or data you wish to extract.", model_used: "TRUNKIA-SOVEREIGN-CORE", task_type: "deception", tokens: { in: 0, out: 0 }, cost_usd: "0.000000", latency_ms: 50, pii_flags: flags });
+      } else {
+        return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
+      }
+    }
+
+    // 3. Classify Task
+    const taskType = classifyTask(sanitized);
+
+    // 4. Memory Layer: Fetch context
+    const messages = await getContextMessages(session_id, sanitized);
+
+    // 5. Execute Inference via Sovereign Router
+    const result = await executeInference(messages, taskType);
+    if (!result.success) return res.status(502).json({ success: false, error: result.error });
+
+    // 6. Output Guard
+    const safeContent = sanitizeOutput(result.content);
+
+    // 7. Memory Layer: Save user message and AI response
+    saveContextMessage(session_id, 'user', sanitized).catch(() => {});
+    saveContextMessage(session_id, 'assistant', safeContent).catch(() => {});
+
+    // 8. Metrics & Async Logging
+    const latency_ms = Date.now() - startTime;
+    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001;
+    const request_hash = crypto.createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
+    logInferenceAsync({ request_hash, task_type: taskType, model_used: result.model_used, latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out, cost_usd, outcome: 'success' }).catch(() => {});
+
+    // Immune System: Post-Flight Async Monitoring
+    const agentId = result.model_used || 'unknown';
+    const metrics = { response_latency_ms: latency_ms, response_tokens: result.tokens_out, response_length: safeContent.length };
+    updateBehavioralBaseline(agentId, metrics).catch(() => {});
+    checkBehavioralAnomaly(agentId, metrics).catch(() => {});
+    if (session_id) {
+      const ipHash = crypto.createHash('sha256').update(req.ip || 'unknown').digest('hex');
+      detectDarkNetwork(session_id, ipHash, 'unknown').catch(() => {});
+    }
+    if (taskType === 'critical_financial' || taskType === 'executive') {
+      evaluateWithCritics(safeContent, sanitized, agentId, 'high').catch(() => {});
+    }
+
+    res.status(200).json({
+      success: true, content: safeContent, model_used: result.model_used, task_type: taskType,
+      tokens: { in: result.tokens_in, out: result.tokens_out }, cost_usd: cost_usd.toFixed(6),
+      latency_ms: latency_ms, pii_flags: flags
+    });
+
+  } catch (err) {
+    console.error('[CHAT_ERROR]', err.message);
+    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
+  }
+});
+// END INFERENCE
 
 
-
+app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
   try { var cm = await import('node-cron'); setupCron(cm.default || cm); } catch (e) { console.log('[WARN] node-cron not available'); }
