@@ -1,4 +1,4 @@
-import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync } from './lib/inference.js';
+import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
 import dotenv from 'dotenv';
@@ -90,7 +90,7 @@ app.post('/api/inference/cost-estimate', (req, res) => {
 
 app.post('/api/inference/chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, session_id } = req.body;
     if (!message || typeof message !== 'string' || message.length > 50000) {
       return res.status(400).json({ success: false, error: 'Invalid message' });
     }
@@ -109,26 +109,32 @@ app.post('/api/inference/chat', async (req, res) => {
     // 3. Classify Task
     const taskType = classifyTask(sanitized);
     
-    // 4. Execute Inference via Sovereign Router
-    const result = await executeInference(sanitized, taskType);
+    // 4. Memory Layer: Fetch context
+    const messages = await getContextMessages(session_id, sanitized);
+    
+    // 5. Execute Inference via Sovereign Router
+    const result = await executeInference(messages, taskType);
     if (!result.success) {
       return res.status(502).json({ success: false, error: result.error });
     }
     
-    // 5. Output Guard (Sanitize AI response)
+    // 6. Output Guard
     const safeContent = sanitizeOutput(result.content);
     
-    // 6. Metrics Calculation
+    // 7. Memory Layer: Save user message and AI response
+    saveContextMessage(session_id, 'user', sanitized).catch(() => {});
+    saveContextMessage(session_id, 'assistant', safeContent).catch(() => {});
+    
+    // 8. Metrics & Async Logging
     const latency_ms = Date.now() - startTime;
-    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001; // Placeholder price
+    const cost_usd = (result.tokens_in + result.tokens_out) * 0.000001;
     const request_hash = crypto.createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
     
-    // 7. Async DB Logging (Fire and forget)
     logInferenceAsync({
       request_hash, task_type: taskType, model_used: result.model_used,
       latency_ms, tokens_in: result.tokens_in, tokens_out: result.tokens_out,
       cost_usd, outcome: 'success'
-    }).catch(err => console.error('[ASYNC_LOG_ERR]', err.message));
+    }).catch(() => {});
     
     res.status(200).json({
       success: true,
