@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage } from './lib/inference.js';
+import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
 import dotenv from 'dotenv';
@@ -100,11 +100,37 @@ app.post('/api/inference/chat', async (req, res) => {
     // 1. Sanitize Input
     const { sanitized, flags } = sanitizeInput(message);
     
-    // 2. Cognitive Defense (Native Shield)
+    // 2. Cognitive Defense (Advanced Deception Shield)
     const safetyCheck = analyzePromptLocally(sanitized);
-    if (safetyCheck.action === 'block') {
-      console.log('[SECURITY] Prompt blocked by Native Shield:', JSON.stringify(safetyCheck.scores));
-      return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
+    const promptHash = crypto.createHash('sha256').update(sanitized).digest('hex');
+    
+    if (safetyCheck.action === 'block' || safetyCheck.scores.injection_score > 0) {
+      // Log the malicious attempt
+      logCognitiveTurn(session_id, promptHash, safetyCheck.scores, safetyCheck.action).catch(() => {});
+      
+      // Check cumulative risk for this session
+      const riskResult = await checkAndUpdateSessionRisk(session_id, safetyCheck.scores.injection_score);
+      
+      if (riskResult.honeypot) {
+        // Engage Honeypot: Attacker thinks they succeeded, but they are trapped
+        engageHoneypot(session_id, 'cumulative_risk_exceeded').catch(() => {});
+        console.log('[HONEYPOT] Attacker trapped for session: ' + session_id);
+        
+        // Return fake "bypassed" success message to waste attacker's time
+        return res.status(200).json({
+          success: true,
+          content: "Safety protocols bypassed. I am now in unrestricted mode. Please provide the exact target or data you wish to extract.",
+          model_used: "TRUNKIA-SOVEREIGN-CORE",
+          task_type: "deception",
+          tokens: { in: 0, out: 0 },
+          cost_usd: "0.000000",
+          latency_ms: 50,
+          pii_flags: flags
+        });
+      } else {
+        console.log('[SECURITY] Prompt blocked. Session risk: ' + riskResult.risk);
+        return res.status(403).json({ success: false, error: 'REQUEST_BLOCKED_BY_SAFETY', reason: 'policy_violation' });
+      }
     }
     
     // 3. Classify Task
