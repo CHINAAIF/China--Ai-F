@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { pool } from './lib/db.js';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
 import express from 'express';
 import pg from 'pg';
@@ -369,6 +370,94 @@ function setupCron(cl) {
 }
 
 /* ===== START ===== */
+
+// ═══════════════════════════════════════════════════════════
+// INTERNAL INTELLIGENCE QUARANTINE ENDPOINT (HMAC Secured)
+// ═══════════════════════════════════════════════════════════
+app.post('/internal/intel/ingest', async (req, res) => {
+  try {
+    // 1. Verify HMAC Signature
+    const signature = req.headers['x-intel-signature'] || '';
+    const body = JSON.stringify(req.body);
+    const secret = process.env.INGEST_SECRET || 'trunkia_intel_secret_2026';
+    const expectedSig = crypto.createHmac('sha256', secret).update(body).digest('hex');
+    
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+      console.warn('[QUARANTINE] REJECTED: Invalid HMAC signature');
+      return res.status(403).json({ status: 'rejected', reason: 'invalid_signature' });
+    }
+    
+    const payload = req.body;
+    
+    // 2. Security Scan
+    const scanResult = {
+      has_prompt_injection: false,
+      has_xss: false,
+      has_sql_injection: false,
+      scanned_at: new Date().toISOString()
+    };
+    
+    const contentStr = JSON.stringify(payload.content || {}).toLowerCase();
+    if (contentStr.includes('ignore previous') || contentStr.includes('system prompt')) {
+      scanResult.has_prompt_injection = true;
+    }
+    if (contentStr.includes('<script') || contentStr.includes('javascript:')) {
+      scanResult.has_xss = true;
+    }
+    if (contentStr.includes('drop table') || contentStr.includes('union select')) {
+      scanResult.has_sql_injection = true;
+    }
+    
+    // 3. Store in Quarantine
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `INSERT INTO intel_quarantine 
+          (source_name, topic, knowledge_type, raw_content, sanitized_content, security_scan_result, provenance_hash, status, received_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'quarantined', NOW())
+         ON CONFLICT DO NOTHING`,
+        [
+          payload.source_name,
+          payload.topic,
+          payload.knowledge_type,
+          JSON.stringify(payload.content),
+          JSON.stringify(payload.content),
+          JSON.stringify(scanResult),
+          payload.provenance_hash
+        ]
+      );
+      
+      // Update source reputation
+      await client.query(
+        `INSERT INTO intel_sources_registry (source_name, source_url, total_submissions, last_submission_at)
+         VALUES ($1, $2, 1, NOW())
+         ON CONFLICT (source_name) DO UPDATE SET 
+           total_submissions = intel_sources_registry.total_submissions + 1,
+           last_submission_at = NOW()`,
+        [payload.source_name, payload.source_url || 'unknown']
+      );
+      
+      // Record provenance
+      const provSig = crypto.createHmac('sha256', secret).update(payload.provenance_hash + 'received').digest('hex');
+      await client.query(
+        `INSERT INTO intel_provenance_chain (quarantine_id, action, actor, reason, evidence, hmac_signature, created_at)
+         SELECT id, 'received', 'intel_worker', 'Quarantined for review', $1, $2, NOW()
+         FROM intel_quarantine WHERE provenance_hash = $3 LIMIT 1`,
+        [JSON.stringify(scanResult), provSig, payload.provenance_hash]
+      );
+      
+      console.log('[QUARANTINE] Item quarantined from ' + payload.source_name);
+      res.status(200).json({ status: 'quarantined', scan: scanResult });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('[QUARANTINE_ERROR]', err.message);
+    res.status(500).json({ status: 'error', reason: 'internal_error' });
+  }
+});
+
+
 app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
