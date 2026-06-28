@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { pool } from './lib/db.js';
-import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';
+import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';;;
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
 import './lib/cognitive-optimizer.mjs';
 import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
@@ -30,7 +30,11 @@ app.post('/api/admin/generate-key', async (req, res) => {
     const daily_limit = (req.body && req.body.daily_limit) || 1.00;
     const newKey = await generateNewApiKey(null, daily_limit);
     res.status(201).json({ success: true, api_key: newKey });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
+  }
 });
+
 
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
@@ -241,6 +245,214 @@ app.get('/api/system/metrics', function(req, res) { var mem = process.memoryUsag
 app.get('/api/self-heal/run', async function(req, res) { try { var r = await selfHeal(); res.json(r); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/self-heal/status', function(req, res) { res.json({ circuit_breaker: { state: circuit.state, failures: circuit.failures, last_failure: circuit.lastFailure ? new Date(circuit.lastFailure).toISOString() : null, failure_threshold: circuit.failureThreshold, reset_timeout_ms: circuit.resetTimeoutMs, success_threshold: circuit.successThreshold }, cached_health: cachedHealth, cache_age_seconds: cacheTime ? Math.floor((Date.now() - cacheTime) / 1000) : null }); });
 app.get('/api/self-heal/circuit/reset', function(req, res) { circuit.state = 'CLOSED'; circuit.failures = 0; circuit.halfOpenSuccesses = 0; res.json({ circuit: 'reset', new_state: 'CLOSED' }); });
+
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+app.post('/api/inference/chat', async (req, res) => {
+  try {
+    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
+    await validateApiKeyAndQuota(rawKey);
+    const { message, session_id } = req.body || {};
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    const { sanitized, flags, rejected } = sanitizeInput(message);
+    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
+    const promptAnalysis = analyzePromptLocally(sanitized);
+    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
+    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
+    if (riskState.honeypot) {
+      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
+      if (decoy) return res.json(decoy);
+    }
+    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
+    const taskType = classifyTask(sanitized);
+    const contextMessages = await getContextMessages(session_id, sanitized);
+    const startTime = Date.now();
+    const inferenceResult = await executeInference(contextMessages, taskType);
+    const latency = Date.now() - startTime;
+    if (!inferenceResult.success) {
+      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
+      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
+    }
+    const safeContent = sanitizeOutput(inferenceResult.content);
+    await saveContextMessage(session_id, 'user', sanitized);
+    await saveContextMessage(session_id, 'assistant', safeContent);
+    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
+    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
 
 /* ===== 404 HANDLER ===== */
 app.use(function(req, res) {
