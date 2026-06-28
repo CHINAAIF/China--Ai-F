@@ -279,6 +279,7 @@ app.post('/api/inference/chat', async (req, res) => {
     await saveContextMessage(session_id, 'assistant', safeContent);
     logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
     res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/inference/chat', async (req, res) => {
