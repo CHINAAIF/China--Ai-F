@@ -1,3 +1,4 @@
+import { scraperGuard } from "./botDefense.js";
 import crypto from 'crypto';
 import { pool } from './lib/db.js';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';;;
@@ -74,6 +75,7 @@ app.use('/api/scheduler/trigger/', strictLimiter);
 
 /* ===== SECURITY: Body Size ===== */
 app.use(express.json({ limit: '100kb' }));
+app.use(scraperGuard);
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 /* ===== CIRCUIT BREAKER ===== */
