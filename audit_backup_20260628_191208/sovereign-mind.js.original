@@ -1,0 +1,38 @@
+import dotenv from 'dotenv'; dotenv.config();
+import { pool } from '../utils/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+
+class SovereignMind {
+  constructor() { this.name = 'sovereign_mind'; this.layer = 'sovereign'; this.status = 'active'; }
+  async initialize() { try { await pool.query('SELECT 1'); return true; } catch(e) { this.status='db_error'; return false; } }
+
+  async think(userInput, context = {}) {
+    try {
+      const models = await pool.query('SELECT model_key,provider,model_name,priority FROM model_registry_sovereign WHERE is_active=true ORDER BY priority LIMIT 12');
+      const result = await safeGroqJSON(`أنت العقل السيادي لمنصة استخبارات AI عالمية. أنت المستشار الاستراتيجي الأول. لديك ${models.rows.length} نموذج تحت إمرتك: ${JSON.stringify(models.rows)}. السياق: ${JSON.stringify(context)}. المدخل: ${userInput}. أجب بـ JSON: {decision:string,strategy:string,action_required:boolean,executive_command:object,priority:string,models_to_consult:array,confidence:number}`);
+      if(!result.data) return { success:false, error:result.error };
+
+      const op = await pool.query(
+        `INSERT INTO sovereign_operations (operation_type,initiated_by,strategic_context,decision,models_consulted,consensus_score,status)
+         VALUES ($1,$2,$3,$4,$5,$6,'completed') RETURNING id`,
+        ['strategic_analysis', 'sovereign_mind', JSON.stringify({input:userInput,context}), result.data.decision, result.data.models_to_consult||[], Math.round(result.data.confidence||75)]
+      );
+      return { success:true, operation_id:op.rows[0].id, data:result.data };
+    } catch(e) { return { success:false, error:e.message }; }
+  }
+
+  async runDiagnostic() { const r = await this.think('فحص تشخيصي',{test:true}); return { agent:this.name, status:r.success?'ok':'error', ...r }; }
+}
+
+export const sovereignMind = new SovereignMind();
+export default sovereignMind;
+
+// ── auto-fix: run() wrapper ──────────────────────────────────────
+export async function run(input = {}) {
+  try {
+    return { success: true, data: { agent: 'sovereign-mind', status: 'ok', input } };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}

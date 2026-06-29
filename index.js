@@ -1,3 +1,4 @@
+import { secureOutput } from "./security_bridge.js";
 import { scraperGuard } from "./botDefense.js";
 import crypto from 'crypto';
 import { pool } from './lib/db.js';

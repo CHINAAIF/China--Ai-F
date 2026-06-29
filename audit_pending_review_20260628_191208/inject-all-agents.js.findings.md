@@ -1,0 +1,12 @@
+⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading          
+**Finding 1 – Potential Path‑Traversal When Writing Agent Files**  
+*Location:* Object.entries(agents).forEach(([name, data]) => { … }) (lines 1‑10 of the main loop)  
+*Risk Explanation:* The agent name (name) is concatenated straight into a file path (./agents/${name}.js) and written with fs.writeFileSync. If an attacker could influence any key of the agents object (e.g., by modifying this file or by dynamically adding objects at runtime), they could supply values such as '../dangerous.json'. That would cause the script to write outside the intended ./agents directory, potentially overwriting arbitrary files on the system (e.g., package.json, .env, or system configuration files).  
+*Exact Fixed Code (diff style):*  
+```diff
+-const filePat = `./agents/${name}.js`;
++// Ensure the agent name is a simple identifier and that we stay within the ./agents directory
++const sanitizedName = name.replace(/[^a-zA-Z0-9_]/g, '');
++if (sanitizedName !== name) {
++    console.warn(`
+
