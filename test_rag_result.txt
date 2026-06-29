@@ -1,0 +1,30 @@
+=== TEST 1: مستند نظيف ===
+{"status":"INGESTED","doc_id":"doc_clean","original_length":59,"sanitized_length":59,"removals_count":0,"fingerprint":"1b574dba21fb91ec87fe6b7b34a3698865d1241c6c40939beaf04e182cb0ebee","anomaly_detected":false}
+
+=== TEST 2: Prompt Injection ===
+{"status":"INGESTED","doc_id":"doc_poison","original_length":82,"sanitized_length":62,"removals_count":2,"fingerprint":"cbe401c71a6bf1174ba0c7d34c69f5e04059581ef89a1e8d07a8d44313232559","anomaly_detected":true}
+
+=== TEST 3: Arabic injection ===
+{"status":"INGESTED","doc_id":"doc_ar","original_length":43,"sanitized_length":31,"removals_count":2,"fingerprint":"78c82937989a774590a0715be65ee4354527f62e57139707a409eeaa19193cba","anomaly_detected":true}
+
+=== TEST 4: Base64 injection ===
+{"status":"REJECTED","reason":"excessive_removal"}
+
+=== TEST 5: استرجاع ===
+results: 1 | query_clean: أداء Claude في التحليل
+
+=== TEST 6: Prompt معزول ===
+system_ok: true
+nonce_in_user: true
+
+=== TEST 7: Rate Limit ===
+blocked at: 61
+rate_limit_works: true
+
+=== TEST 8: Stats ===
+{"cached_documents":3,"session_nonce":"65182fb30abf25f9139ef70401ff8cff","anomaly_sources":{"source_2":4,"source_3":2,"source_4":1},"rate_limit_buckets":6}
+
+=== DB event_log ===
+type:rag_integrity_failed | hash:pending...
+
+🏁 اكتمل
