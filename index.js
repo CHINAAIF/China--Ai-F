@@ -108,7 +108,7 @@ function getPool() {
   if (!pool) {
     var dbUrl = fixDbUrl(process.env.DATABASE_URL);
     if (!dbUrl) throw new Error('DATABASE_URL is not set');
-    pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: true } });
     pool.on('error', function(err) { console.error('[POOL ERROR]', err.message); circuitRecordFailure(); });
   }
   return pool;

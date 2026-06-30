@@ -1,5 +1,5 @@
 import pg from 'pg'; import dotenv from 'dotenv'; dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
 class TrustScore {
   constructor(){this.w={a:0.30,r:0.20,s:0.30,st:0.20};}
   async calc(slug){

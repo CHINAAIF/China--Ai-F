@@ -10,7 +10,7 @@ var fixed = parts[0] + '?' + parts.slice(1).join('?').split('&').filter(function
   return p.indexOf('channel_binding=') !== 0;
 }).join('&');
 
-var pool = new pg.Pool({ connectionString: fixed, ssl: { rejectUnauthorized: false } });
+var pool = new pg.Pool({ connectionString: fixed, ssl: { rejectUnauthorized: true } });
 
 var tables = [
   'models',

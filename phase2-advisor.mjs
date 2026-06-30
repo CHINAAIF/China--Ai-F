@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import pg from 'pg';
 import { validateRecord } from './utils/output-validator.js';
 dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
 
 console.log('=== TRUNKIA Phase 2: Advisor Layer ===\n');
 

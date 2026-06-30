@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import { readFileSync } from 'fs';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function diag() {
   try {
     // 1. event_log last 5 hash values

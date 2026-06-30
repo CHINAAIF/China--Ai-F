@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 // إعداد الاتصال بقاعدة البيانات باستخدام المتغيرات البيئية المؤمنة
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: true }
 });
 
 /**

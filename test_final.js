@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function test() {
   await pool.query("DELETE FROM governance_contracts WHERE nonce LIKE 'clean-%'").catch(function(){});
   await pool.query("DELETE FROM nonce_registry WHERE nonce LIKE 'clean-%'").catch(function(){});

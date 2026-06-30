@@ -25,7 +25,7 @@ function sanitizeDbUrl(url) {
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
   ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT || undefined }
-  : { rejectUnauthorized: false };
+  : { rejectUnauthorized: true };
 
 // ── Pool مفرد مع حماية Race Condition ────────────────────────
 let pool = null;

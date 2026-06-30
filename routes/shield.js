@@ -8,7 +8,7 @@ import { tableExists } from '../agents/utils/executor.js';
 import pg from 'pg';
 
 var router = Router();
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: true } });
 
 function hashText(text) {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex').substring(0, 64);

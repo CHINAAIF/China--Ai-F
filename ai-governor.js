@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import pg from 'pg';
 const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: true } });
 
 export async function checkPermission(role, resource, action) {
   const result = await pool.query(

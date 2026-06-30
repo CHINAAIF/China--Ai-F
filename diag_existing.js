@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function diag() {
   try {
     // 1. event_log schema

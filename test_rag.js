@@ -40,7 +40,7 @@ console.log('rate_limit_works:', blocked);
 console.log('\n=== TEST 8: Stats ===');
 console.log(JSON.stringify(mem.getStats()));
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 const logs = await pool.query(
   `SELECT event_type, payload_hash FROM event_log 
    WHERE agent_id='sovereign_memory' 

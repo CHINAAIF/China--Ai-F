@@ -15,7 +15,7 @@ for (const d of dirs) {
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: true }
 });
 
 const TABLES = [
@@ -102,6 +102,7 @@ async function migrate() {
         for (const idx of t.indexes) {
           try { await client.query(idx); } catch(_) {}
         }
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) throw new Error('اسم جدول غير صالح: ' + t.name);
         const { rows: verify } = await client.query(`SELECT COUNT(*) FROM ${t.name}`);
         console.log(`✅ ${t.name} created — rows: ${verify[0].count}`);
       } catch(e) {

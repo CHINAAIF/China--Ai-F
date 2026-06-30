@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function run() {
   await pool.query("UPDATE data_sensitivity_rules SET active=false");
   console.log('Deactivated old rules');

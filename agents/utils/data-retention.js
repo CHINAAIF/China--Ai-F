@@ -57,6 +57,7 @@ export async function analyzeTablesAfterCleanup() {
   const tables = Object.keys(RETENTION);
   for (const table of tables) {
     try {
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) throw new Error('اسم جدول غير صالح: ' + table);
       await pool.query(`ANALYZE ${table}`);
     } catch(_) {}
   }

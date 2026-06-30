@@ -2,7 +2,7 @@
 import express from 'express';
 import pg from 'pg';
 const router = express.Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 router.get('/status', async (req, res) => {
   try {

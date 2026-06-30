@@ -5,7 +5,7 @@ dotenv.config();
 const { Pool } = pg;
 const pool = new Pool({ 
     connectionString: process.env.DATABASE_URL, 
-    ssl: { rejectUnauthorized: false } 
+    ssl: { rejectUnauthorized: true } 
 });
 
 console.log('🧠 [النواة المركزية]: بدء عملية التطهير الهيكلي وحقن الـ 93 وكيل...');

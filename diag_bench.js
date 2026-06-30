@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function diag() {
   var t1 = await pool.query("SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name='model_accuracy_registry' ORDER BY ordinal_position");
   console.log('=== model_accuracy_registry ===');

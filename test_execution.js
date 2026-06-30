@@ -2,7 +2,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 import { executionLayer } from './agents/governance/execution-layer.js';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 async function test() {
   console.log('🔍 تهيئة execution-layer...');

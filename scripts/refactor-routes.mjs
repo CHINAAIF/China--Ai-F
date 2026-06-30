@@ -11,7 +11,7 @@ const sovereignRoutes = `
 import express from 'express';
 import pg from 'pg';
 const router = express.Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 router.get('/status', async (req, res) => {
   try {
@@ -28,7 +28,7 @@ import express from 'express';
 import pg from 'pg';
 import crypto from 'crypto';
 const router = express.Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 // ── Request ID middleware ────────────────────────────────────────
 router.use((req, res, next) => {
@@ -59,7 +59,7 @@ const metricsRoutes = `
 import express from 'express';
 import pg from 'pg';
 const router = express.Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 router.get('/performance', async (req, res) => {
   try {

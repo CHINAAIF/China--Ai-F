@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function run() {
   try {
     await pool.query("ALTER TABLE data_sensitivity_rules DROP CONSTRAINT data_sensitivity_rules_category_check");

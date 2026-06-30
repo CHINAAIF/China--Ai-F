@@ -2,7 +2,7 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
 dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
 
 // FIX 1: Check what's actually in those 35 skipped records
 console.log('=== Checking raw_content samples ===');

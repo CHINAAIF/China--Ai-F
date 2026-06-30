@@ -39,7 +39,7 @@ console.log('diagnostic status:', r4.status);
 
 // تحقق فعلي من DB — القاعدة 5
 import pg from 'pg';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 const verify = await pool.query(
   `SELECT id, nonce, used, content_hash, signature, valid_until 
    FROM governance_contracts 

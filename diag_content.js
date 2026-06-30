@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function diag() {
   var checks = [
     ['model_pricing_tiers', 'model_capabilities', 'model_accuracy_registry', 'model_benchmarks', 'prompts', 'articles', 'courses', 'models', 'model_reviews', 'model_view_stats'],

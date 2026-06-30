@@ -1,7 +1,7 @@
 
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-const pool = new pg.Pool({connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false}});
+const pool = new pg.Pool({connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true}});
 const log = msg => console.log('['+new Date().toISOString()+'] '+msg);
 
 const existing = await pool.query('SELECT m.slug, mc.capability FROM model_capabilities mc JOIN models m ON m.id=mc.model_id ORDER BY m.slug, mc.capability');

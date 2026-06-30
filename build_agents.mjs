@@ -8,7 +8,7 @@ console.log('🚀 بدء البناء...');
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: true }
 });
 await client.connect();
 console.log('✅ DB متصل');

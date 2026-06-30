@@ -7,7 +7,7 @@ import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: true }
 });
 
 // ── Schema المسموح به لكل نوع بيانات ────────────────────────────

@@ -2,7 +2,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import fs from 'fs';
 import crypto from 'crypto';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 var HOME = '/data/data/com.termux/files/home/downloads/China--Ai-F';
 
 async function fix() {
@@ -42,7 +42,7 @@ async function fix() {
     'import dotenv from "dotenv"; dotenv.config();',
     'import pg from "pg";',
     'import crypto from "crypto";',
-    'const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });',
+    'const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });',
     '',
     'async function test() {',
     '  // Read the source file directly and eval to bypass cache',

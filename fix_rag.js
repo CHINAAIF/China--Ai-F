@@ -3,7 +3,7 @@ import pg from 'pg';
 import crypto from 'crypto';
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-32-chars-minimum!!';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 // إصلاح المشكلة 1 — payload_hash بقي pending
 console.log('=== إصلاح payload_hash المعلق ===');

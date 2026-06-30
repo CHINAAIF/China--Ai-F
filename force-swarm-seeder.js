@@ -6,7 +6,7 @@ const { Pool } = pg;
 // تأمين الاتصال وتجاوز تحذيرات الـ SSL الصارمة في بيئات الإنتاج
 const pool = new Pool({ 
     connectionString: process.env.DATABASE_URL, 
-    ssl: { rejectUnauthorized: false } 
+    ssl: { rejectUnauthorized: true } 
 });
 
 console.log('🧠 [المساعد الداخلي]: بدء بروتوكول هندسة الجداول الذاتي وحقن الـ Swarm بالقوة...');

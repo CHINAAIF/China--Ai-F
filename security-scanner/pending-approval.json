@@ -1,0 +1,866 @@
+[
+  {
+    "type": "secret_exposed",
+    "severity": "critical",
+    "file": "./test_safety2.js",
+    "pattern": "AWS Access Key",
+    "count": 1,
+    "action_required": "مراجعة يدوية + نقل لـ.env + إبطال السر إن كان حقيقي"
+  },
+  {
+    "type": "secret_exposed",
+    "severity": "critical",
+    "file": "./test_safety2.js",
+    "pattern": "Private Key Block",
+    "count": 1,
+    "action_required": "مراجعة يدوية + نقل لـ.env + إبطال السر إن كان حقيقي"
+  },
+  {
+    "type": "secret_exposed",
+    "severity": "critical",
+    "file": "./test_shield_api.js",
+    "pattern": "AWS Access Key",
+    "count": 2,
+    "action_required": "مراجعة يدوية + نقل لـ.env + إبطال السر إن كان حقيقي"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/china-social.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/us_models_agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/eu_models_agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/pricing_oracle_agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/benchmark_runner_agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/model-benchmarking-engine.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/cost-calculator-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/model-fingerprint-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/intelligence/data-quality-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/tactical-routing.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/policy-enforcer.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/replay-guard.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/audit-gateway-v2.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/key-sentinel.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/agent-supervisor.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/advisor-layer.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/execution-layer.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/governance/safety-compliance-layer.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/learning/ground-truth-validator.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/learning/brain-pipeline-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/learning/reputation-updater-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/learning/causal-memory-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/utils/data-retention.js",
+    "pattern": "SQL Injection (string concat)",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/utils/db.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/utils/db-pool.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/execution/execution-engine.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/routing/circuit-breaker.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/system/self-healing-agent.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/rag/sovereign-memory.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./agents/rag/sovereign-memory.js",
+    "pattern": "Hardcoded default secret fallback",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./index.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./auth.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./ai-governor.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./deploy-93-agents-swarm.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./force-swarm-seeder.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./final-swarm-seeder.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./cron-runner.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/migrate-judicial-layer.js",
+    "pattern": "SQL Injection (string concat)",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/migrate-judicial-layer.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/migrate-redundancy.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/migrate-infra.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/migrate-brain-layers.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./scripts/refactor-routes.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 3,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./build_agents.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./step1_migrations.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./show_tables.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_global_models.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_pricing.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_pricing_precision.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_benchmarks.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_benchmark_scores.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./process_intelligence.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./routes/health.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./routes/metrics.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./routes/sovereign.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./routes/shield.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./test_advisor.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_existing.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_missing.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag2.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./test_execution.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_hash_and_retest.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_both.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_hashes.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./test_after_fix.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_hash_bug.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_rules.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_all_hash.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_colcount.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_reqhash.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_final_hash.js",
+    "pattern": "SSL verification disabled",
+    "count": 2,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./test_final.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_bench.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./mk_tables.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./mk_rules2.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_action_check.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_cat_check.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_arabic_regex.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_shield_import.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_shield_import2.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./diag_content.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./add_models_and_indexes.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_new_benchmarks.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./check_capabilities.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./seed_capabilities.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./update_languages.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./utils/trust-score-calculator.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./utils/db-pool.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./phase1-fix.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./phase1b-fix.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./phase2-advisor.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./api/routes/geopolitical-risk.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./phase2-complete-data.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix-data.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix2.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix3.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_pricing_enum.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./check_avail_enum.mjs",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./_diag.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./_ag.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./lib/db.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./botDefense.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_rag.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./fix_rag.js",
+    "pattern": "Hardcoded default secret fallback",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  },
+  {
+    "type": "code_pattern",
+    "severity": "critical",
+    "file": "./test_rag.js",
+    "pattern": "SSL verification disabled",
+    "count": 1,
+    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
+  }
+]

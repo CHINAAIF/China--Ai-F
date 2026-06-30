@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function test() {
   try {
     await pool.query("DELETE FROM governance_contracts WHERE nonce LIKE 'tfix-%'").catch(function(){});

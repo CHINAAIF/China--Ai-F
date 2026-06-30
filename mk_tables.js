@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function run() {
   try {
     await pool.query("CREATE TABLE IF NOT EXISTS data_sensitivity_rules (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), rule_name VARCHAR(100) NOT NULL UNIQUE, category VARCHAR(50) NOT NULL CHECK (category IN ('pii','financial','health','government','proprietary','public')), pattern TEXT NOT NULL, risk_level SMALLINT NOT NULL CHECK (risk_level BETWEEN 1 AND 10), action VARCHAR(20) NOT NULL CHECK (action IN ('block','mask','flag','allow')), description TEXT, active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW())");

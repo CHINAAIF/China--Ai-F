@@ -12,7 +12,7 @@ if (!process.env.DATABASE_URL) {
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
   ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT || undefined }
-  : { rejectUnauthorized: false };
+  : { rejectUnauthorized: true };
 
 // ── Pool محمي ─────────────────────────────────────────────────
 const pool = new pg.Pool({

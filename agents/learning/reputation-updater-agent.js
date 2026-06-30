@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'; import pg from 'pg'; dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
 class ReputationAgent{
   constructor(){this.name='reputation_updater';this.version='1.0.0';}
   async updateReputation(){

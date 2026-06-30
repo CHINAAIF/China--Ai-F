@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 async function diag() {
   var r = await pool.query("SELECT rulename, definition FROM pg_rules WHERE tablename='event_log'");
   console.log('Rules on event_log: ' + r.rows.length);
