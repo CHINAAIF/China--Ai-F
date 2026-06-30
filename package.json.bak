@@ -1,0 +1,33 @@
+{
+  "type": "module", "type": "module", "name": "trunkia-core",
+  "version": "1.0.0",
+  "description": "TRUNKIA — Global AI Model Navigator. Transparency. Comparison. Mastery.",
+  "main": "index.js",
+  "scripts": { "start": "node index.js "scripts": { node agents/TelegramAgent.js",
+    "start": "node --max-old-space-size=512 index.js",
+    "cron": "node cron-runner.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
+    "better-auth": "^1.6.19",
+    "concurrently": "^10.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "express-slow-down": "^3.1.0",
+    "express-validator": "^7.3.2",
+    "groq-sdk": "^1.2.1",
+    "helmet": "^8.2.0",
+    "node-cron": "^4.2.1",
+    "pg": "^8.21.0",
+    "telegraf": "^4.16.3",
+    "uuid": "^14.0.0",
+    "winston": "^3.19.0"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "_railway_deploy": "2026-06-22T08:45:51.160Z"
+}
