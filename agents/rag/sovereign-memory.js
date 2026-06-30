@@ -13,7 +13,10 @@ const pool = new pg.Pool({
   ssl: { rejectUnauthorized: true }
 });
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-32-chars-minimum!!';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
+  throw new Error('🔴 ENCRYPTION_KEY غير موجود أو قصير — توقف فوري، لا تستخدم مفتاح افتراضي');
+}
 
 // ───────────────────────────────────────────────────────────────────
 // TIER 1 — أنماط التهديد الشاملة

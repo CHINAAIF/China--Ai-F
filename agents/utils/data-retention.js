@@ -16,6 +16,7 @@ export async function runRetention() {
   const results = {};
 
   for (const [table, interval] of Object.entries(RETENTION)) {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) { results[table] = 'invalid_table_name'; continue; }
     try {
       // فحص الجدول أولاً
       const { rows: exists } = await pool.query(`
