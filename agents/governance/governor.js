@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { pool } from '../utils/db.js';
+import { pool } from './db-governance.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 dotenv.config();
 

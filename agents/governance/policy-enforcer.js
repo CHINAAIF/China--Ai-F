@@ -7,7 +7,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
 
 class PolicyEnforcer {
   constructor() {

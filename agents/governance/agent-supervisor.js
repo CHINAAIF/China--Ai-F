@@ -3,7 +3,7 @@ import pg from 'pg';
 import crypto from 'crypto';
 import { tableExists } from '../utils/executor.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
 const MASTER_KEY = process.env.ENCRYPTION_KEY || 'trunkia-key';
 const HEARTBEAT_TIMEOUT_MS = 5 * 60000;
 

@@ -6,7 +6,7 @@ import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL_GOVERNANCE,
   ssl: { rejectUnauthorized: true }
 });
 
