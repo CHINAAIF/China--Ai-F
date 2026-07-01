@@ -244,6 +244,13 @@ app.get('/api/scheduler/trigger/:name', async function(req, res) { try { var n =
 /* ===== SYSTEM PULSE ===== */
 app.get('/api/system/pulse', async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 7, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: cronStats }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures }, security: { helmet: true, rate_limit_active: true, cors_enabled: true } }, endpoints: 21, requests_served: requestCounter, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
 app.post('/api/inference', handleSovereignInference);
+app.post('/api/intelligence/strategic-analysis', async (req, res) => {
+  try {
+    const result = await strategicIntelligenceAgent.analyzeMarket(req.body.pricing, req.body.benchmarks, req.body.risks);
+    if (result.success === false) return res.status(500).json({ error: result.error });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/system/metrics', function(req, res) { var mem = process.memoryUsage(); res.json({ process: { pid: process.pid, node_version: process.version, platform: process.platform, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000), requests_served: requestCounter }, memory: { rss_mb: Math.round(mem.rss / 1024 / 1024), heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024), heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024) }, security: { helmet: true, rate_limit: '120/min', cors: true, body_limit: '100kb' } }); });
 
 /* ===== SELF-HEAL + CIRCUIT ===== */
@@ -482,3 +489,4 @@ app.listen(PORT, async function() {
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
   try { var cm = await import('node-cron'); setupCron(cm.default || cm); } catch (e) { console.log('[WARN] node-cron not available'); }
 });
+
