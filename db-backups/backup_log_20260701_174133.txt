@@ -1,0 +1,7 @@
+🛡️ TRUNKIA - DATABASE SAFETY PROTOCOL
+========================================
+
+🔍 فحص الاتصال بقاعدة البيانات...
+✅ CONNECTION_OK
+📋 تصدير هيكل قاعدة البيانات...
+pg_dump: error: invalid URI query parameter: "uselibpqcompat"

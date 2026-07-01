@@ -3,7 +3,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import Groq from 'groq-sdk';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{ rejectUnauthorized: true } });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_INTELLIGENCE, ssl:{ rejectUnauthorized: true } });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class USModelsAgent {

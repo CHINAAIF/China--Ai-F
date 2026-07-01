@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'; import pg from 'pg'; dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl:{rejectUnauthorized: true}});
 class CostCalcAgent {
   constructor(){this.name='cost_calculator';this.version='1.0.0';}
   async calculate(params){

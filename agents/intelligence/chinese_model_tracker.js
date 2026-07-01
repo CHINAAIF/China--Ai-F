@@ -1,6 +1,6 @@
 import { logExecution, safeStep } from '../utils/executor.js';
 import { config } from 'dotenv'; config();
-import { pool } from '../utils/db.js';
+import { pool } from './db-intelligence.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 
 class ChineseModelTrackerAgent {

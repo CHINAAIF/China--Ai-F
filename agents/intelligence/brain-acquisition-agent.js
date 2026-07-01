@@ -1,6 +1,6 @@
 import { logExecution, safeStep } from '../utils/executor.js';
 import dotenv from 'dotenv'; dotenv.config();
-import { pool } from '../utils/db.js';
+import { pool } from './db-intelligence.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { pingHeartbeat } from '../utils/heartbeat.js';

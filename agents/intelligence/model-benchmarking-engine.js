@@ -5,7 +5,7 @@ import Groq from 'groq-sdk';
 import crypto from 'crypto';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: true } });
+var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_INTELLIGENCE, ssl: { rejectUnauthorized: true } });
 var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 var BENCHMARK_DOMAINS = ['financial', 'policy', 'analysis', 'content', 'pricing'];
