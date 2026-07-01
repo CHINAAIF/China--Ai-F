@@ -469,6 +469,14 @@ app.post('/api/inference/chat', async (req, res) => {
   }
 });
 
+app.post('/api/intelligence/arxiv-scan', async (req, res) => {
+  try {
+    const result = await arxivSentinelAgent.scan(req.body.topic);
+    if (!result.success) return res.status(500).json({ error: result.error });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 /* ===== 404 HANDLER ===== */
 app.use(function(req, res) {
   res.status(404).json({ error: 'Not found', request_id: req._requestId || 'unknown' });
@@ -486,14 +494,6 @@ function setupCron(cl) {
 }
 
 /* ===== START ===== */
-app.post('/api/intelligence/arxiv-scan', async (req, res) => {
-  try {
-    const result = await arxivSentinelAgent.scan(req.body.topic);
-    if (!result.success) return res.status(500).json({ error: result.error });
-    res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
