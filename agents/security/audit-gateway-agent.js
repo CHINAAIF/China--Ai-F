@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { pool } from '../utils/db.js';
+import { pool } from './db-security.js';
 import { semanticFirewall } from '../utils/semantic-firewall.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
