@@ -7,7 +7,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import { safeGroqJSON } from '../utils/safe-json.js';
 
-import { pool } from './db-learning.js';
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 
 class BrainPipelineAgent {
   constructor() { this.name='brain-pipeline-agent'; this.layer='learning'; this.status='active'; }

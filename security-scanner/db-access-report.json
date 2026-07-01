@@ -1,0 +1,472 @@
+{
+  "agents/intelligence": [
+    {
+      "file": "china-social.js",
+      "tables": [
+        "intelligence_sources",
+        "intelligence_raw",
+        "learning_candidates",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "chinese_model_tracker.js",
+      "tables": [
+        "chinese_ai_models",
+        "model_timeline",
+        "temporal_intelligence",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_policy_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_company_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_research_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_investment_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_patent_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_sanctions_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china_media_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "global_models_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "global_comparison_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "global_price_gap_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "competitor_monitor_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "supply_chain_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "china-news-agent.js",
+      "tables": [
+        "agent_registry",
+        "agent_heartbeat",
+        "intelligence_raw",
+        "agent_circuit_breaker"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "pricing-tracker-agent.js",
+      "tables": [
+        "agent_registry",
+        "agent_heartbeat",
+        "intelligence_raw"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "brain-acquisition-agent.js",
+      "tables": [
+        "source_reputation",
+        "brain_working_memory",
+        "brain_knowledge_gaps",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "us_models_agent.js",
+      "tables": [
+        "intelligence_raw",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "eu_models_agent.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "pricing_oracle_agent.js",
+      "tables": [
+        "models",
+        "vendors",
+        "model_pricing_tiers"
+      ],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "benchmark_runner_agent.js",
+      "tables": [
+        "benchmark_definitions",
+        "model_benchmarks",
+        "models",
+        "vendors"
+      ],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "model-benchmarking-engine.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "cost-calculator-agent.js",
+      "tables": [
+        "model_pricing_tiers",
+        "models",
+        "vendors"
+      ],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "model-fingerprint-agent.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "data-quality-agent.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    }
+  ],
+  "agents/governance": [
+    {
+      "file": "governor.js",
+      "tables": [
+        "model_consensus",
+        "governance_decisions",
+        "learning_candidates",
+        "learning_rejected",
+        "learning_approved"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "multi-model.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "master_orchestrator.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "task_distributor.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "quality_auditor.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "emergency_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "scheduler_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "crisis_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "verification-agent.js",
+      "tables": [
+        "agent_registry",
+        "agent_heartbeat",
+        "intelligence_raw",
+        "agent_circuit_breaker"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "tactical-routing-agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "tactical-routing.js",
+      "tables": [
+        "routing_decisions",
+        "event_log"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "policy-enforcer.js",
+      "tables": [
+        "policy_documents",
+        "policy_conflicts_log",
+        "event_log"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "replay-guard.js",
+      "tables": [
+        "governance_contracts",
+        "nonce_registry",
+        "event_log"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "audit-gateway-v2.js",
+      "tables": [
+        "event_log",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "key-sentinel.js",
+      "tables": [
+        "byok_keys",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "agent-supervisor.js",
+      "tables": [
+        "event_log",
+        "agent_supervision",
+        "diagnostic_repairs",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "advisor-layer.js",
+      "tables": [
+        "governance_contracts",
+        "nonce_registry",
+        "event_log",
+        "routing_decisions"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "execution-layer.js",
+      "tables": [
+        "nonce_registry",
+        "byok_keys",
+        "event_log",
+        "routing_decisions"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "safety-compliance-layer.js",
+      "tables": [
+        "compliance_checks",
+        "privacy_scores",
+        "incident_reports",
+        "event_log"
+      ],
+      "access": "READ_WRITE"
+    }
+  ],
+  "agents/learning": [
+    {
+      "file": "filter_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "verification_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "approval_agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "learning_agent.js",
+      "tables": [
+        "brain_memory",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "knowledge-distillation-agent.js",
+      "tables": [
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "epistemic-firewall-agent.js",
+      "tables": [
+        "brain_filtered_memory",
+        "brain_working_memory",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "memory-promotion-engine.js",
+      "tables": [
+        "brain_hard_memory",
+        "brain_filtered_memory",
+        "brain_sovereign_memory",
+        "knowledge_conflicts",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "ground-truth-validator.js",
+      "tables": [
+        "source_reputation",
+        "intelligence_verified",
+        "intelligence_raw",
+        "agent_execution_logs"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "brain-pipeline-agent.js",
+      "tables": [
+        "brain_working_memory",
+        "brain_filtered_memory",
+        "brain_knowledge_gaps"
+      ],
+      "access": "READ_WRITE"
+    },
+    {
+      "file": "reputation-updater-agent.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    },
+    {
+      "file": "causal-memory-agent.js",
+      "tables": [
+        "inference_providers"
+      ],
+      "access": "READ_WRITE"
+    }
+  ],
+  "agents/execution": [
+    {
+      "file": "execution-engine.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    }
+  ],
+  "agents/routing": [
+    {
+      "file": "circuit-breaker.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    }
+  ],
+  "agents/system": [
+    {
+      "file": "self-healing-agent.js",
+      "tables": [],
+      "access": "READ_ONLY"
+    }
+  ],
+  "agents/rag": [
+    {
+      "file": "sovereign-memory.js",
+      "tables": [
+        "event_log",
+        "sovereign_memory_local"
+      ],
+      "access": "READ_WRITE"
+    }
+  ]
+}

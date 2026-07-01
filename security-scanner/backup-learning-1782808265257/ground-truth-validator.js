@@ -3,7 +3,7 @@ import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import Groq from 'groq-sdk';
 
-import { pool } from './db-learning.js';
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{ rejectUnauthorized: true } });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class GroundTruthValidator {

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { pool } from './db-learning.js';
+import { pool } from '../utils/db.js';
 import { distill } from '../utils/knowledge-distiller.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';

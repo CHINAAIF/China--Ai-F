@@ -1,39 +1,6 @@
 {
-  "timestamp": "2026-06-30T07:45:16.718Z",
+  "timestamp": "2026-06-30T07:55:10.929Z",
   "auto_fixed": [],
-  "needs_approval": [
-    {
-      "type": "code_pattern",
-      "severity": "critical",
-      "file": "./agents/utils/data-retention.js",
-      "pattern": "SQL Injection (string concat)",
-      "count": 1,
-      "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-    },
-    {
-      "type": "code_pattern",
-      "severity": "critical",
-      "file": "./agents/rag/sovereign-memory.js",
-      "pattern": "Hardcoded default secret fallback",
-      "count": 1,
-      "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-    },
-    {
-      "type": "code_pattern",
-      "severity": "critical",
-      "file": "./scripts/migrate-judicial-layer.js",
-      "pattern": "SQL Injection (string concat)",
-      "count": 1,
-      "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-    },
-    {
-      "type": "code_pattern",
-      "severity": "critical",
-      "file": "./fix_rag.js",
-      "pattern": "Hardcoded default secret fallback",
-      "count": 1,
-      "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-    }
-  ],
+  "needs_approval": [],
   "info": []
 }

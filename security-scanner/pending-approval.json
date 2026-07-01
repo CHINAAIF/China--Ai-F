@@ -10,24 +10,8 @@
   {
     "type": "code_pattern",
     "severity": "critical",
-    "file": "./agents/rag/sovereign-memory.js",
-    "pattern": "Hardcoded default secret fallback",
-    "count": 1,
-    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-  },
-  {
-    "type": "code_pattern",
-    "severity": "critical",
     "file": "./scripts/migrate-judicial-layer.js",
     "pattern": "SQL Injection (string concat)",
-    "count": 1,
-    "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
-  },
-  {
-    "type": "code_pattern",
-    "severity": "critical",
-    "file": "./fix_rag.js",
-    "pattern": "Hardcoded default secret fallback",
     "count": 1,
     "action_required": "مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة"
   }

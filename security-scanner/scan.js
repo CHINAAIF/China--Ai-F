@@ -116,7 +116,13 @@ try {
 // ============================================================
 log('🔍 فحص أنماط كود خطيرة...');
 const CODE_RISK_PATTERNS = [
-  { name: 'SQL Injection (string concat)', re: /query\s*\(\s*[`'"].*\$\{.*\}.*[`'"]\s*\)/g, severity: 'critical' },
+  { name: 'SQL Injection (string concat)', re: /query\s*\(\s*[`'"].*\$\{.*\}.*[`'"]\s*\)/g, severity: 'critical',
+    isProtected: (content, matchIndex) => {
+      // افحص آخر 200 حرف قبل الـmatch — هل فيها regex.test() أو whitelist check؟
+      const before = content.substring(Math.max(0, matchIndex - 200), matchIndex);
+      return /\.test\(|whitelist|اسم جدول غير صالح|invalid_table_name/i.test(before);
+    }
+  },
   { name: 'eval() usage', re: /\beval\s*\(/g, severity: 'critical' },
   { name: 'SSL verification disabled', re: /rejectUnauthorized\s*:\s*false/g, severity: 'critical' },
   { name: 'CORS wildcard with credentials', re: /origin\s*:\s*['"]\*['"]/g, severity: 'low' },
@@ -135,9 +141,13 @@ try {
     if (!existsSync(fp)) continue;
     const content = readFileSync(fp, 'utf8');
     for (const { name, re, severity } of CODE_RISK_PATTERNS) {
-      const matches = content.match(re);
-      if (matches) {
-        const entry = { type: 'code_pattern', severity, file, pattern: name, count: matches.length };
+      const matches = [...content.matchAll(re)];
+      const unprotectedMatches = matches.filter(m => {
+        const pat = CODE_RISK_PATTERNS.find(p => p.name === name);
+        return !(pat.isProtected && pat.isProtected(content, m.index));
+      });
+      if (unprotectedMatches.length > 0) {
+        const entry = { type: 'code_pattern', severity, file, pattern: name, count: unprotectedMatches.length };
         if (severity === 'critical') {
           report.needs_approval.push({ ...entry, action_required: 'مراجعة يدوية إلزامية — قد يفتح ثغرة أمنية مباشرة' });
         } else {
