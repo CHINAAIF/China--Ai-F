@@ -1,7 +1,0 @@
-⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading⣟  Loading⣯  Loading⣷  Loading⣾  Loading⣽  Loading⣻  Loading⢿  Loading⡿  Loading          
-**File:** ./agents/service/cache_agent.js
-
-| # | Location | Risk Description | Minimal Fix (diff) |
-|---|----------|------------------|--------------------|
-| 1 | await pool.query( INSERT line | The INSERT statement lists 6 columns (agent_name,action,input,output,confidence,status) but supplies only 4 placeholders ($1,$2,$3,$4).  This mismatch triggers a PostgreSQL error, causing the log write to fail silently. Because the failure is swallowed in the inner catch, the function reports success even though the execution was not logged.  This bug can hide real failures and corrupt the audit trail. | diff<br>@@<br>-        await pool.query(\n-          `INSERT INTO agent_execution_logs (agent_name,action,input,output,confidence,status) VALUES ($1,'cache',$2,$3,$4,$5)`<br>-          [this.name, JSON.stringify(input), JSON.stringify(result.data), Math.min(100,Math.max(0,Math.round(result.data.confidence||75)))]\n+        await pool.query(\n+          `INSERT INTO agent_execution_logs (agent_name,action,input,output,confidence,status) VALUES ($1,$2,$3,$4,$
-
