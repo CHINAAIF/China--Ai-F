@@ -6,6 +6,7 @@ import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzeP
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
 import './lib/cognitive-optimizer.mjs';
 import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
+import { strategicIntelligenceAgent } from './agents/intelligence/strategic-intelligence-agent.js';
 import { handleSovereignInference } from './lib/sovereign-inference-router.mjs';
 import express from 'express';
 import pg from 'pg';
