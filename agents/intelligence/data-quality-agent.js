@@ -36,7 +36,15 @@ class DQAgent{
       
       // Only enrich if comp > 30 (meaningful data exists)
       if(comp>=30){
-        try{await pool.query("UPDATE models SET metadata=jsonb_set(COALESCE(metadata,'{}',JSON.stringify({compl:comp})) WHERE id=$1",[m.id]);en++;}
+        try{
+          await pool.query(
+            "UPDATE models SET metadata=jsonb_set(COALESCE(metadata,'{}'::jsonb),'{compl}',$1::jsonb) WHERE id=$2",
+            [JSON.stringify(comp), m.id]
+          );
+          en++;
+        }catch(e){
+          console.error('  enrich error for', m.id, e.message);
+        }
         if(en%5===0)console.log('  enriched:',en,'/',ml.length);
       }
     }
