@@ -7,6 +7,7 @@ import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, 
 import './lib/cognitive-optimizer.mjs';
 import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
 import { strategicIntelligenceAgent } from './agents/intelligence/strategic-intelligence-agent.js';
+import { arxivSentinelAgent } from './agents/intelligence/arxiv-sentinel-agent.js';
 import { handleSovereignInference } from './lib/sovereign-inference-router.mjs';
 import express from 'express';
 import pg from 'pg';
@@ -485,6 +486,14 @@ function setupCron(cl) {
 }
 
 /* ===== START ===== */
+app.post('/api/intelligence/arxiv-scan', async (req, res) => {
+  try {
+    const result = await arxivSentinelAgent.scan(req.body.topic);
+    if (!result.success) return res.status(500).json({ error: result.error });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.listen(PORT, async function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
   try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
