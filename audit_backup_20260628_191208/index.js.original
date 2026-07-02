@@ -25,7 +25,7 @@ app.set('trust proxy', 1);
 app.post('/api/admin/generate-key', async (req, res) => {
   try {
     const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+    if (adminSecret !== (process.env.ADMIN_SECRET)) {
       return res.status(403).json({ success: false, error: 'FORBIDDEN' });
     }
     const daily_limit = (req.body && req.body.daily_limit) || 1.00;

@@ -3,7 +3,7 @@
 app.post('/api/admin/generate-key', async (req, res) => {
   try {
     const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
+    if (adminSecret !== (process.env.ADMIN_SECRET)) {
       return res.status(403).json({ success: false, error: 'FORBIDDEN' });
     }
     const { user_id, daily_limit } = req.body;

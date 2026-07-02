@@ -23,24 +23,6 @@ dotenv.config();
 var app = express();
 app.set('trust proxy', 1);
 
-// ═══════════════════════════════════════════════════════════
-// ADMIN ENDPOINT: Generate Sovereign API Key
-// ═══════════════════════════════════════════════════════════
-app.post('/api/admin/generate-key', async (req, res) => {
-  try {
-    const adminSecret = req.headers['x-admin-secret'];
-    if (adminSecret !== (process.env.ADMIN_SECRET || 'trunkia_sovereign_admin_2026')) {
-      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
-    }
-    const daily_limit = (req.body && sanitize(sanitize(req.body.daily_limit))) || 1.00;
-    const newKey = await generateNewApiKey(null, daily_limit);
-    res.status(201).json({ success: true, api_key: newKey });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
-  }
-});
-
-
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -81,6 +63,76 @@ app.use('/api/scheduler/trigger/', strictLimiter);
 app.use(express.json({ limit: '100kb' }));
 app.use(scraperGuard);
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+
+
+/* ===== SECURITY: Admin Key Generation ===== */
+function constantTimeSecretMatch(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string') return false;
+  if (provided.length === 0 || expected.length < 32) return false;
+
+  const providedHash = crypto.createHash('sha256').update(provided, 'utf8').digest();
+  const expectedHash = crypto.createHash('sha256').update(expected, 'utf8').digest();
+
+  return crypto.timingSafeEqual(providedHash, expectedHash);
+}
+
+function parseAdminDailyLimit(value) {
+  const maxFromEnv = Number(process.env.ADMIN_MAX_DAILY_LIMIT || 100);
+  const maxDailyLimit = Number.isFinite(maxFromEnv) && maxFromEnv > 0 ? maxFromEnv : 100;
+
+  const rawValue = value === undefined || value === null || value === '' ? 1 : Number(value);
+
+  if (!Number.isFinite(rawValue) || rawValue <= 0 || rawValue > maxDailyLimit) {
+    return { ok: false, max: maxDailyLimit };
+  }
+
+  return { ok: true, value: Math.round(rawValue * 100) / 100, max: maxDailyLimit };
+}
+
+var adminLimiter = rateLimit({
+  windowMs: 60000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'ADMIN_RATE_LIMITED', retry_after: 60 }
+});
+
+app.post('/api/admin/generate-key', adminLimiter, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+
+  try {
+    const configuredSecret = process.env.ADMIN_SECRET;
+
+    if (typeof configuredSecret !== 'string' || configuredSecret.length < 32) {
+      return res.status(503).json({ success: false, error: 'ADMIN_SECRET_NOT_CONFIGURED' });
+    }
+
+    const providedSecret = req.get('x-admin-secret');
+
+    if (!constantTimeSecretMatch(providedSecret, configuredSecret)) {
+      return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+    }
+
+    const parsedLimit = parseAdminDailyLimit(req.body && req.body.daily_limit);
+
+    if (!parsedLimit.ok) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_DAILY_LIMIT',
+        max_daily_limit: parsedLimit.max
+      });
+    }
+
+    const newKey = await generateNewApiKey(null, parsedLimit.value);
+
+    return res.status(201).json({ success: true, api_key: newKey });
+  } catch (err) {
+    console.error('[ADMIN_KEY_ERROR]', err.message);
+    return res.status(500).json({ success: false, error: 'INTERNAL_ERROR' });
+  }
+});
+
 
 /* ===== CIRCUIT BREAKER ===== */
 var circuit = { state: 'CLOSED', failures: 0, lastFailure: 0, successThreshold: 3, failureThreshold: 5, resetTimeoutMs: 30000, halfOpenSuccesses: 0 };
