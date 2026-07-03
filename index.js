@@ -315,8 +315,16 @@ app.get('/api/self-heal/circuit/reset', function(req, res) { circuit.state = 'CL
 
 app.post('/api/inference/chat', async (req, res) => {
   try {
-    const rawKey = req.headers['authorization'] ? req.headers['authorization'].replace('Bearer ', '') : null;
-    await validateApiKeyAndQuota(rawKey);
+    const authHeader = req.get('authorization') || '';
+    const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    const rawKey = bearerMatch ? bearerMatch[1].trim() : null;
+    const authResult = await validateApiKeyAndQuota(rawKey);
+
+    if (!authResult.valid) {
+      return res.status(authResult.code || 401).json({
+        error: authResult.message || 'UNAUTHORIZED'
+      });
+    }
     const { message, session_id } = req.body || {};
     if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
     const { sanitized, flags, rejected } = sanitizeInput(message);
