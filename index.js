@@ -173,6 +173,14 @@ async function safeQuery(sql, params) {
   try { var r = await getPool().query(sql, params); circuitRecordSuccess(); return r; }
   catch (e) { circuitRecordFailure(); throw e; }
 }
+function sanitize(value) {
+  if (value === undefined || value === null) return '';
+  return String(value)
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .slice(0, 256)
+    .replace(/[^a-zA-Z0-9_.,:\-\s]/g, '')
+    .trim();
+}
 
 /* ===== CACHED HEALTH ===== */
 var cachedHealth = null;
