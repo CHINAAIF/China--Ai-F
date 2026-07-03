@@ -206,6 +206,24 @@ function classifyLayer(name, fp) {
   if (dh === 'service' || ln.indexOf('servic') !== -1) return 'service';
   return dh || 'autonomous';
 }
+function isInfrastructureAgentFile(fileName, fileRel) {
+  var rel = String(fileRel || '').replace(/\\/g, '/');
+  var name = String(fileName || '').toLowerCase();
+
+  if (!rel || !name) return true;
+  if (rel === 'index.js' || rel === 'registry.js') return true;
+  if (rel.indexOf('utils/') === 0) return true;
+  if (name === 'db.js' || name === 'db-pool.js') return true;
+  if (name.indexOf('db-') === 0) return true;
+  if (name.endsWith('.backup.js') || name.endsWith('.test.js') || name.endsWith('.spec.js')) return true;
+
+  return false;
+}
+
+function isAgentRuntimeFile(fileName, fileRel) {
+  return !isInfrastructureAgentFile(fileName, fileRel);
+}
+
 function scanAgentFiles(baseDir, relPath) {
   var dir = baseDir || path.join(__dirname, 'agents');
   var rel = relPath || '';
@@ -219,7 +237,7 @@ function scanAgentFiles(baseDir, relPath) {
     var full = path.join(dir, e.name);
     var fileRel = rel ? rel + '/' + e.name : e.name;
     if (e.isDirectory()) { var sub = scanAgentFiles(full, fileRel); for (var j = 0; j < sub.length; j++) results.push(sub[j]); }
-    else if (e.isFile() && e.name.endsWith('.js')) { var nm = e.name.replace('.js', ''); var st; try { st = fs.statSync(full); } catch (ex) { st = { size: 0 }; } results.push({ agent_name: nm, agent_layer: classifyLayer(nm, fileRel), filename: fileRel, file_size: st.size }); }
+    else if (e.isFile() && e.name.endsWith('.js') && isAgentRuntimeFile(e.name, fileRel)) { var nm = e.name.replace('.js', ''); var st; try { st = fs.statSync(full); } catch (ex) { st = { size: 0 }; } results.push({ agent_name: nm, agent_layer: classifyLayer(nm, fileRel), filename: fileRel, file_size: st.size }); }
   }
   return results;
 }
