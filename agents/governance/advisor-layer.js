@@ -4,6 +4,7 @@ import pg from 'pg';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { logEvent } from './event-logger.js';
 
 // ══════════════════════════════════════════════════════════════
 // التحقق الصارم من البيئة — رفض التشغيل إذا غابت المتغيرات
