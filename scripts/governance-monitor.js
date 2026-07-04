@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Trinkia Governance Monitor v3.4
- * Shows names of newly registered tables
+ * Trinkia Governance Monitor v3.5
+ * Enhanced reporting + better drift detection
  */
 
 import dotenv from 'dotenv';
@@ -69,12 +69,11 @@ async function registerNewTable(tableName) {
 
 function calculateHealthScore(protectedCount, totalSensitive) {
   if (totalSensitive === 0) return 100;
-  const coverage = (protectedCount / totalSensitive) * 100;
-  return Math.round(Math.min(coverage, 100));
+  return Math.round(Math.min((protectedCount / totalSensitive) * 100, 100));
 }
 
 async function runGovernanceMonitor() {
-  console.log('=== TRINKIA GOVERNANCE MONITOR v3.4 ===\n');
+  console.log('=== TRINKIA GOVERNANCE MONITOR v3.5 ===\n');
 
   const protectedTables = await getProtectedTables();
   const registeredTables = await getRegisteredTables();
@@ -120,7 +119,7 @@ async function runGovernanceMonitor() {
   console.log(`Governance Health Score: ${healthScore}/100\n`);
 
   if (newlyRegistered.length > 0) {
-    console.log('=== Newly Registered Tables ===');
+    console.log('Newly Registered:');
     newlyRegistered.forEach(t => console.log(`  - ${t}`));
     console.log('');
   }
