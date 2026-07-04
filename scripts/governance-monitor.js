@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Trinkia Governance Monitor v3.5
- * Enhanced reporting + better drift detection
+ * Trinkia Governance Monitor v3.6
+ * Source of truth: Actual RULES in database (not registry status)
  */
 
 import dotenv from 'dotenv';
@@ -22,16 +22,19 @@ const SENSITIVE_KEYWORDS = [
   'threat', 'zero_trust', 'canary', 'byok', 'sovereign_key'
 ];
 
-async function getProtectedTables() {
+async function getProtectedTablesCount() {
   const result = await pool.query(`
-    SELECT tablename 
-    FROM pg_rules 
-    WHERE schemaname = 'public' 
-      AND (rulename LIKE '%_no_update' OR rulename LIKE '%_no_delete')
-    GROUP BY tablename
-    HAVING COUNT(*) = 2
+    SELECT COUNT(*) as total 
+    FROM (
+      SELECT tablename 
+      FROM pg_rules 
+      WHERE schemaname = 'public' 
+        AND (rulename LIKE '%_no_update' OR rulename LIKE '%_no_delete')
+      GROUP BY tablename
+      HAVING COUNT(*) = 2
+    ) t
   `);
-  return result.rows.map(r => r.tablename);
+  return parseInt(result.rows[0].total);
 }
 
 async function getRegisteredTables() {
@@ -67,15 +70,10 @@ async function registerNewTable(tableName) {
   return false;
 }
 
-function calculateHealthScore(protectedCount, totalSensitive) {
-  if (totalSensitive === 0) return 100;
-  return Math.round(Math.min((protectedCount / totalSensitive) * 100, 100));
-}
-
 async function runGovernanceMonitor() {
-  console.log('=== TRINKIA GOVERNANCE MONITOR v3.5 ===\n');
+  console.log('=== TRINKIA GOVERNANCE MONITOR v3.6 ===\n');
 
-  const protectedTables = await getProtectedTables();
+  const protectedCount = await getProtectedTablesCount();
   const registeredTables = await getRegisteredTables();
 
   let tamperDetected = 0;
@@ -109,20 +107,14 @@ async function runGovernanceMonitor() {
     }
   }
 
-  const updatedRegistered = await getRegisteredTables();
-  const healthScore = calculateHealthScore(protectedTables.length, updatedRegistered.length);
+  const healthScore = protectedCount >= registeredTables.length ? 100 : 
+                      Math.round((protectedCount / registeredTables.length) * 100);
 
-  console.log(`Protected Tables       : ${protectedTables.length}`);
-  console.log(`Registered Sensitive   : ${updatedRegistered.length}`);
-  console.log(`Tamper Events          : ${tamperDetected}`);
-  console.log(`New Tables Registered  : ${newlyRegistered.length}`);
-  console.log(`Governance Health Score: ${healthScore}/100\n`);
-
-  if (newlyRegistered.length > 0) {
-    console.log('Newly Registered:');
-    newlyRegistered.forEach(t => console.log(`  - ${t}`));
-    console.log('');
-  }
+  console.log(`Protected Tables (RULES) : ${protectedCount}`);
+  console.log(`Registered Sensitive     : ${registeredTables.length}`);
+  console.log(`Tamper Events            : ${tamperDetected}`);
+  console.log(`New Tables Registered    : ${newlyRegistered.length}`);
+  console.log(`Governance Health Score  : ${healthScore}/100\n`);
 
   if (tamperDetected > 0 || newlyRegistered.length > 0) {
     console.log('⚠️  Action Required');
@@ -131,8 +123,8 @@ async function runGovernanceMonitor() {
   }
 
   await logGovernanceEvent('daily_health_report', 'system', {
-    protected: protectedTables.length,
-    registered: updatedRegistered.length,
+    protected: protectedCount,
+    registered: registeredTables.length,
     tamper: tamperDetected,
     new_registered: newlyRegistered.length,
     health_score: healthScore
