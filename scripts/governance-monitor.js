@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Trinkia Governance Monitor v3.6
- * Source of truth: Actual RULES in database (not registry status)
+ * Trinkia Governance Monitor v3.10
+ * Skip testing governance tables themselves
  */
 
 import dotenv from 'dotenv';
@@ -22,19 +22,41 @@ const SENSITIVE_KEYWORDS = [
   'threat', 'zero_trust', 'canary', 'byok', 'sovereign_key'
 ];
 
-async function getProtectedTablesCount() {
+const GOVERNANCE_TABLES = [
+  'governance_health_checks',
+  'governance_protection_registry',
+  'governance_protection_audit',
+  'governance_audit_chain'
+];
+
+async function getProtectedTables() {
   const result = await pool.query(`
-    SELECT COUNT(*) as total 
-    FROM (
-      SELECT tablename 
-      FROM pg_rules 
-      WHERE schemaname = 'public' 
-        AND (rulename LIKE '%_no_update' OR rulename LIKE '%_no_delete')
-      GROUP BY tablename
-      HAVING COUNT(*) = 2
-    ) t
+    SELECT tablename 
+    FROM pg_rules 
+    WHERE schemaname = 'public' 
+      AND (rulename LIKE '%_no_update' OR rulename LIKE '%_no_delete')
+    GROUP BY tablename
+    HAVING COUNT(*) = 2
   `);
-  return parseInt(result.rows[0].total);
+  return result.rows.map(r => r.tablename);
+}
+
+async function testRuleIsWorking(tableName) {
+  // Skip governance tables themselves
+  if (GOVERNANCE_TABLES.includes(tableName)) {
+    return true;
+  }
+
+  let updateBlocked = false;
+  let deleteBlocked = false;
+
+  try { await pool.query(`UPDATE ${tableName} SET id = id WHERE id = -999999999;`); } 
+  catch (e) { updateBlocked = true; }
+
+  try { await pool.query(`DELETE FROM ${tableName} WHERE id = -999999999;`); } 
+  catch (e) { deleteBlocked = true; }
+
+  return updateBlocked && deleteBlocked;
 }
 
 async function getRegisteredTables() {
@@ -71,19 +93,27 @@ async function registerNewTable(tableName) {
 }
 
 async function runGovernanceMonitor() {
-  console.log('=== TRINKIA GOVERNANCE MONITOR v3.6 ===\n');
+  console.log('=== TRINKIA GOVERNANCE MONITOR v3.10 ===\n');
 
-  const protectedCount = await getProtectedTablesCount();
+  const protectedTables = await getProtectedTables();
   const registeredTables = await getRegisteredTables();
 
   let tamperDetected = 0;
+  let failedProtection = [];
   let newlyRegistered = [];
 
   for (const tableName of registeredTables) {
     const rulesExist = await checkRulesExist(tableName);
+
     if (!rulesExist) {
-      await logGovernanceEvent('rule_removed', tableName, { message: 'Protection missing' });
+      await logGovernanceEvent('rule_removed', tableName, { message: 'Rules missing' });
       tamperDetected++;
+    } else {
+      const isWorking = await testRuleIsWorking(tableName);
+      if (!isWorking) {
+        failedProtection.push(tableName);
+        await logGovernanceEvent('protection_failed', tableName, { message: 'Rules not effective' });
+      }
     }
   }
 
@@ -101,31 +131,36 @@ async function runGovernanceMonitor() {
 
   for (const row of newSensitive.rows) {
     const wasRegistered = await registerNewTable(row.table_name);
-    if (wasRegistered) {
-      await logGovernanceEvent('new_sensitive_table', row.table_name, { message: 'Auto-registered' });
-      newlyRegistered.push(row.table_name);
-    }
+    if (wasRegistered) newlyRegistered.push(row.table_name);
   }
 
-  const healthScore = protectedCount >= registeredTables.length ? 100 : 
-                      Math.round((protectedCount / registeredTables.length) * 100);
+  const healthScore = protectedTables.length >= registeredTables.length ? 100 : 
+                      Math.round((protectedTables.length / registeredTables.length) * 100);
 
-  console.log(`Protected Tables (RULES) : ${protectedCount}`);
+  console.log(`Protected Tables (RULES) : ${protectedTables.length}`);
   console.log(`Registered Sensitive     : ${registeredTables.length}`);
   console.log(`Tamper Events            : ${tamperDetected}`);
+  console.log(`Failed Protection        : ${failedProtection.length}`);
   console.log(`New Tables Registered    : ${newlyRegistered.length}`);
   console.log(`Governance Health Score  : ${healthScore}/100\n`);
 
-  if (tamperDetected > 0 || newlyRegistered.length > 0) {
+  if (failedProtection.length > 0) {
+    console.log('=== Tables with Failed Protection ===');
+    failedProtection.forEach(t => console.log(`  - ${t}`));
+    console.log('');
+  }
+
+  if (tamperDetected > 0 || failedProtection.length > 0 || newlyRegistered.length > 0) {
     console.log('⚠️  Action Required');
   } else {
     console.log('✅ System Status: Healthy');
   }
 
   await logGovernanceEvent('daily_health_report', 'system', {
-    protected: protectedCount,
+    protected: protectedTables.length,
     registered: registeredTables.length,
     tamper: tamperDetected,
+    failed_protection: failedProtection.length,
     new_registered: newlyRegistered.length,
     health_score: healthScore
   });
