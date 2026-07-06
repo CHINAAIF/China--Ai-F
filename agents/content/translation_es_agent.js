@@ -2,8 +2,7 @@
  * translation_es_agent | layer: content
  * منطق Groq حقيقي — يستخدم safe-json.js
  */
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from '../utils/db.js';
+import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 

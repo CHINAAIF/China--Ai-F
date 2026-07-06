@@ -1,7 +1,5 @@
 import crypto from 'crypto';
-import dotenv from 'dotenv'; dotenv.config();
-
-const MAX_STRING_LENGTH = 50000;
+import dotenv from 'dotenv'; const MAX_STRING_LENGTH = 50000;
 const MAX_ARRAY_LENGTH = 500;
 const MAX_OBJECT_DEPTH = 10;
 const MAX_PAYLOAD_SIZE = 1048576;

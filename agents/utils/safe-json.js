@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import Groq from 'groq-sdk';
 import { pool } from './db.js';
 import crypto from 'crypto';

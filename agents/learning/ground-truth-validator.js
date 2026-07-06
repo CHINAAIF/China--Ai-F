@@ -1,6 +1,5 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import Groq from 'groq-sdk';
 
 import { pool } from './db-learning.js';

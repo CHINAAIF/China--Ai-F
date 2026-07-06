@@ -1,7 +1,4 @@
 import pg from 'pg';
-import dotenv from 'dotenv';
-dotenv.config();
-
 // ── التحقق الصارم من البيئة ────────────────────────────────────
 if (!process.env.DATABASE_URL) {
   throw new Error('CRITICAL: DATABASE_URL is not defined. System cannot start.');
@@ -24,8 +21,7 @@ function sanitizeDbUrl(url) {
 // ── SSL صارم في الإنتاج ───────────────────────────────────────
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
-  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT || undefined }
-  : { rejectUnauthorized: true };
+  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT;
 
 // ── Pool مفرد مع حماية Race Condition ────────────────────────
 let pool = null;

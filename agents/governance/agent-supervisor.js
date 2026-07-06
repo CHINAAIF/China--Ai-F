@@ -1,10 +1,9 @@
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import crypto from 'crypto';
 import { tableExists } from '../utils/executor.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
-const MASTER_KEY = process.env.ENCRYPTION_KEY || 'trunkia-key';
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
+const MASTER_KEY = process.env.ENCRYPTION_KEY;
 const HEARTBEAT_TIMEOUT_MS = 5 * 60000;
 
 async function writeEvent(type, agentId, payload) {

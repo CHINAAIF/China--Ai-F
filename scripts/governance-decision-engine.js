@@ -5,11 +5,9 @@
  * (غير قابل للتحديث فعلياً بعد تطبيق append-only RULES على هذا الجدول)
  * الحالة الآن تُشتق بالقراءة: جدول "محلول" إن وُجد له سجل لاحق event_type='resolved'
  */
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: true });
 
 const CLASSIFICATION_RULES = {
   Critical: { keywords: ['chain', 'evidence', 'immune_audit', 'governance_decision', 'security_incident', 'provenance'], priority: 'critical', action: 'IMMEDIATE PROTECTION - Apply append-only rules within 24 hours' },

@@ -1,11 +1,10 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from './db-learning.js';
+import dotenv from 'dotenv'; import { pool } from './db-learning.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { pingHeartbeat } from '../utils/heartbeat.js';
 
-const HMAC_SECRET = process.env.ENCRYPTION_KEY || 'chinaaif-sovereign-secret';
+const HMAC_SECRET = process.env.ENCRYPTION_KEY;
 
 class MemoryPromotionEngine {
   constructor() {

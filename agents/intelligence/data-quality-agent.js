@@ -1,5 +1,4 @@
-import pg from 'pg'; import dotenv from 'dotenv'; dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl:{rejectUnauthorized: true}});
+import pg from 'pg'; import dotenv from 'dotenv'; const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl: true});
 class DQAgent{
   async audit(){
     console.log('=== DATA QUALITY ===');

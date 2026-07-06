@@ -1,15 +1,12 @@
 import pg from 'pg';
-import dotenv from 'dotenv';
 import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { brain } from '../brain.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-dotenv.config();
-
 const { Pool } = pg;
 const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL_INTELLIGENCE, 
-  ssl: { rejectUnauthorized: true } 
+  ssl: true 
 });
 
 export class ChinaSocialAgent {

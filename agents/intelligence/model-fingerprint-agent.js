@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; import pg from 'pg'; import crypto from 'crypto'; dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl:{rejectUnauthorized: true}});
+import dotenv from 'dotenv'; import pg from 'pg'; import crypto from 'crypto'; const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl: true});
 const QUESTIONS=[
   {q:'What is 2+2?',expect:/4|four/i},
   {q:'Translate hello to Arabic',expect:/مربا|أهلا/i},

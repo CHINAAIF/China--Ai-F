@@ -4,11 +4,10 @@ import { logExecution, safeStep } from '../utils/executor.js';
  * العقلية 19: كل nonce مستخدم يُسجَّل ويُرفض إعادة استخدامه
  * nonce_registry أعمدة: nonce, agent_id, customer_id, used_at, expires_at, rejected
  */
-import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
 const WINDOW_SECONDS = 30;
 
 class ReplayGuard {
@@ -30,7 +29,7 @@ class ReplayGuard {
       const content_hash = crypto.createHash('sha256')
         .update(JSON.stringify({ nonce, customer_id, payload, valid_until })).digest('hex');
       const signature = crypto.createHash('sha256')
-        .update(content_hash + (process.env.ENCRYPTION_KEY||'dev')).digest('hex');
+        .update(content_hash + process.env.ENCRYPTION_KEY).digest('hex');
 
       const r = await pool.query(
         `INSERT INTO governance_contracts (nonce, customer_id, policy_version_id, content_hash, signature, valid_until, used)
@@ -65,7 +64,7 @@ class ReplayGuard {
       }
 
       const recomputed = crypto.createHash('sha256')
-        .update(c.content_hash + (process.env.ENCRYPTION_KEY||'dev')).digest('hex');
+        .update(c.content_hash + process.env.ENCRYPTION_KEY).digest('hex');
       if (recomputed !== signature) {
         await this._logEvent('signature_invalid', { contract_id });
         return { valid: false, reason: 'SIGNATURE_INVALID' };
@@ -104,7 +103,7 @@ class ReplayGuard {
     try {
       const payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
       const sig = crypto.createHash('sha256')
-        .update(payload_hash+(process.env.ENCRYPTION_KEY||'dev')).digest('hex');
+        .update(payload_hash+process.env.ENCRYPTION_KEY).digest('hex');
       await pool.query(
         `INSERT INTO event_log (event_type, agent_id, payload, payload_hash, signature)
          VALUES ($1,$2,$3,$4,$5)`,

@@ -9,3 +9,8 @@ fix_*.js
 fix_*.txt
 
 opencode
+
+# Block environment secrets
+.env.staging
+.env.production
+.env.*

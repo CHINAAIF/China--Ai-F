@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
@@ -12,7 +10,7 @@ import { logEvent } from './event-logger.js';
 if (!process.env.DATABASE_URL) {
   throw new Error('CRITICAL: DATABASE_URL not set. System refused to start.');
 }
-if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+if (!process.env.ENCRYPTION_KEY) {
   throw new Error('CRITICAL: ENCRYPTION_KEY missing or too short (min 32 chars). System refused to start.');
 }
 
@@ -22,8 +20,7 @@ const CONTRACT_TTL_MS = 30000;
 // ── SSL صارم في الإنتاج ───────────────────────────────────────
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
-  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT || undefined }
-  : { rejectUnauthorized: true };
+  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT;
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL_GOVERNANCE,

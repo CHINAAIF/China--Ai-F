@@ -3,8 +3,7 @@
  * العقليات: 17(Self-Evolution) + 18(Anomaly) + 20(Anti-Fragility)
  * يرفع الحجر المنتهي → يُقيّم confidence → ينقل المؤهل → يُسجّل gaps
  */
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import { safeGroqJSON } from '../utils/safe-json.js';
 
 import { pool } from './db-learning.js';

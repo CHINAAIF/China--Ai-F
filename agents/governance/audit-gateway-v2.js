@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
@@ -7,7 +5,7 @@ import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL_GOVERNANCE,
-  ssl: { rejectUnauthorized: true }
+  ssl: true
 });
 
 // ── Schema المسموح به لكل نوع بيانات ────────────────────────────
@@ -39,7 +37,7 @@ async function writeEventLog(eventType, agentId, payload, decision) {
       .update(JSON.stringify(fullPayload))
       .digest('hex');
     const signature = crypto
-      .createHmac('sha256', process.env.ENCRYPTION_KEY || 'trunkia-key')
+      .createHmac('sha256', process.env.ENCRYPTION_KEY)
       .update(payloadHash)
       .digest('hex');
 

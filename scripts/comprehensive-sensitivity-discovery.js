@@ -1,9 +1,7 @@
 #!/usr/bin/env node
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: true });
 
 const KNOWN_SENSITIVE_TABLES = [
   'evidence_chain', 'immune_audit_chain', 'intel_provenance_chain', 'provenance_log',

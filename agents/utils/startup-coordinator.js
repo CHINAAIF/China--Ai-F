@@ -1,11 +1,9 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import { pool } from './db.js';
 import crypto from 'crypto';
 
 // ── بصمة فريدة لكل instance ──────────────────────────────────────
 const INSTANCE_ID = crypto.randomBytes(8).toString('hex');
-const STARTUP_KEY = `startup_lock:${process.env.RAILWAY_SERVICE_ID || 'local'}`;
+const STARTUP_KEY = `startup_lock:${process.env.RAILWAY_SERVICE_ID;
 
 // ── جدول الـPipelines بأولوياتها وتأخيراتها ─────────────────────
 const PIPELINE_SCHEDULE = [
@@ -52,7 +50,7 @@ async function registerInstance() {
         started_at = NOW(),
         last_heartbeat = NOW(),
         status = 'starting'
-    `, [INSTANCE_ID, process.env.RAILWAY_SERVICE_ID || 'local']);
+    `, [INSTANCE_ID, process.env.RAILWAY_SERVICE_ID);
 
     console.log(`🆔 Instance registered: ${INSTANCE_ID}`);
     return true;

@@ -1,8 +1,5 @@
 import Groq from 'groq-sdk';
-import dotenv from 'dotenv';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-dotenv.config();
-
 const AVAILABLE_MODELS = {
   groq: !!process.env.GROQ_API_KEY,
   gemini: !!process.env.GEMINI_API_KEY,

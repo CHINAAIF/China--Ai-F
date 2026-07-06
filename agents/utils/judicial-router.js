@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import { pool } from './db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from './safe-json.js';

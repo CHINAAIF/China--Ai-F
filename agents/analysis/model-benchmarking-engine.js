@@ -1,6 +1,5 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from '../utils/db.js';
+import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
 import Groq from 'groq-sdk';
 import { pingHeartbeat } from '../utils/heartbeat.js';
 

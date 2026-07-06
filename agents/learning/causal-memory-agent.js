@@ -3,9 +3,7 @@
  * System learns from its own routing decisions
  * After every 100 decisions → analyze → improve routing priorities
  */
-import dotenv from 'dotenv';
 import pg from 'pg';
-dotenv.config();
 import { pool } from './db-learning.js';
 
 class CausalMemoryAgent {

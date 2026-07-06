@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import { readdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 

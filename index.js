@@ -1,3 +1,6 @@
+import './config/env.js';
+import { runGovernanceMonitor } from './scripts/governance-monitor.js';
+
 import { secureOutput } from "./security_bridge.js";
 import { scraperGuard } from "./botDefense.js";
 import crypto from 'crypto';
@@ -400,7 +403,8 @@ function setupCron(cl) {
     cronJobs['agent-heartbeat'] = cl.schedule('*/5 * * * *', async function() { try { await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'error', error: e.message }; } });
     cronJobs['agent-sync'] = cl.schedule('0 * * * *', async function() { try { var r = await syncAgentsToDb(); cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } });
     cronJobs['self-heal'] = cl.schedule('*/15 * * * *', async function() { try { var r = await selfHeal(); cronStats['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { cronStats['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } });
-    console.log('Cron: 3 jobs scheduled');
+    cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', async function() { try { await runGovernanceMonitor(); cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } });
+    console.log('Cron: 4 jobs scheduled');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 

@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -15,7 +13,7 @@ for (const d of dirs) {
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: true }
+  ssl: true
 });
 
 const TABLES = [

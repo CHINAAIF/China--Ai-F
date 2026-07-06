@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; dotenv.config();
-import crypto from 'crypto';
+import dotenv from 'dotenv'; import crypto from 'crypto';
 import pg from 'pg';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -10,7 +9,7 @@ import pg from 'pg';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: true }
+  ssl: true
 });
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;

@@ -4,12 +4,11 @@ import { logExecution, safeStep } from '../utils/executor.js';
  * قلب Governance Layer — يختار المزود + يسجل في routing_decisions + event_log
  * العقليات: 3(AI أداة) + 12(Router يوجّه) + 13(Causal) + 14(Temporal) + 18(Anomaly)
  */
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
 
 class TacticalRouter {
   constructor() {
@@ -66,7 +65,7 @@ JSON: {"selected_slug":"...","reason":"...","confidence":85,"estimated_cost_usd"
       const payload = { routing_id:routingId, task_type, provider:provider?.slug, causal_reason };
       const payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
       const signature = crypto.createHash('sha256')
-        .update(payload_hash+(process.env.ENCRYPTION_KEY||'dev')).digest('hex');
+        .update(payload_hash+(process.env.ENCRYPTION_KEY)).digest('hex');
       await pool.query(
         `INSERT INTO event_log (event_type, agent_id, customer_id, policy_version_id, payload, payload_hash, signature)
          VALUES ('routing_decision',$1,$2,$3,$4,$5,$6)`,

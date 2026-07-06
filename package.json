@@ -4,8 +4,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start:staging": "NODE_ENV=staging node index.js",
+    "dev:staging": "NODE_ENV=staging node --watch index.js",
+    "start:production": "NODE_ENV=production node index.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -19,5 +20,8 @@
     "helmet": "^8.2.0",
     "node-cron": "^4.5.0",
     "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.9"
   }
 }

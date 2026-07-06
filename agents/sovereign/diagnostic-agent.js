@@ -1,10 +1,9 @@
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from '../utils/db.js';
+import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
 import { createHmac } from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
-const HMAC_SECRET = process.env.ENCRYPTION_KEY || 'sovereign-default-key';
+const HMAC_SECRET = process.env.ENCRYPTION_KEY;
 
 class DiagnosticAgent {
   constructor() { this.name = 'diagnostic_agent'; this.layer = 'sovereign'; this.status = 'active'; }

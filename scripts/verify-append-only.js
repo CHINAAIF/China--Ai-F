@@ -11,14 +11,11 @@
  * - Detects any tampering or rule removal
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
-
 import pg from 'pg';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: true
 });
 
 const protectedTables = [

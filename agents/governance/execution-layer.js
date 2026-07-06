@@ -1,5 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import pg from 'pg';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
@@ -14,8 +12,7 @@ if (!process.env.DATABASE_URL) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
-  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT || undefined }
-  : { rejectUnauthorized: true };
+  ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT;
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL_GOVERNANCE,

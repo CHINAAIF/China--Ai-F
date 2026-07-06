@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import crypto from 'crypto';
 
 // ═══════════════════════════════════════════════════════════
@@ -10,10 +9,10 @@ import crypto from 'crypto';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: true
 });
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-32-chars-minimum!!';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function logEvent(eventType, agentId, customerId, payload) {
   try {

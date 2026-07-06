@@ -7,7 +7,7 @@ if (!process.env.DATABASE_URL_GOVERNANCE) {
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL_GOVERNANCE,
-  ssl: { rejectUnauthorized: true }
+  ssl: true
 });
 
 pool.on('error', (err) => {

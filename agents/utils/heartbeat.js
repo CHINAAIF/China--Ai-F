@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from './db.js';
+import dotenv from 'dotenv'; import { pool } from './db.js';
 
 export async function pingHeartbeat(agentName, status = 'active', metadata = {}) {
   try {

@@ -2,8 +2,7 @@
  * threat_monitor_agent | layer: security
  * منطق Groq حقيقي — يستخدم safe-json.js
  */
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from './db-security.js';
+import dotenv from 'dotenv'; import { pool } from './db-security.js';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 

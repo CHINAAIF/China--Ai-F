@@ -3,11 +3,10 @@ import { logExecution, safeStep } from '../utils/executor.js';
  * policy-enforcer | layer: governance
  * FIX FINAL: hash يُحسب على content::text بعد INSERT — يطابق pg دائماً
  */
-import dotenv from 'dotenv'; dotenv.config();
-import pg from 'pg';
+import dotenv from 'dotenv'; import pg from 'pg';
 import crypto from 'crypto';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl:{rejectUnauthorized: true} });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
 
 class PolicyEnforcer {
   constructor() {
@@ -67,7 +66,7 @@ class PolicyEnforcer {
       const content_raw = raw.rows[0].t;
       const content_hash = crypto.createHash('sha256').update(content_raw).digest('hex');
       const signature = crypto.createHash('sha256')
-        .update(content_hash+(process.env.ENCRYPTION_KEY||'dev')+signed_by).digest('hex');
+        .update(content_hash+(process.env.ENCRYPTION_KEY)+signed_by).digest('hex');
 
       // UPDATE بـhash الصحيح
       await pool.query(
@@ -117,7 +116,7 @@ class PolicyEnforcer {
     try {
       const payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
       const signature = crypto.createHash('sha256')
-        .update(payload_hash+(process.env.ENCRYPTION_KEY||'dev')).digest('hex');
+        .update(payload_hash+(process.env.ENCRYPTION_KEY)).digest('hex');
       await pool.query(
         `INSERT INTO event_log (event_type, agent_id, payload, payload_hash, signature)
          VALUES ($1,$2,$3,$4,$5)`,

@@ -1,8 +1,4 @@
 import { pool } from './utils/db.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
 export class TRUNKIABrain {
     constructor() {
         this.pool = pool;

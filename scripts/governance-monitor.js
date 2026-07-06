@@ -1,22 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Trinkia Governance Monitor v4.0
- * Professional multi-layer protection verification
- * 
- * RULE_BASED     = Tables protected by _no_update + _no_delete rules
- * TRIGGER_BASED  = Tables protected by custom TRIGGER (7 tables only)
+ * Trunkia Governance Monitor v4.1
+ * Professional multi-layer protection verification with Webhook Alerting
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
-
+import '../config/env.js';
 import pg from 'pg';
 import { logGovernanceEvent } from '../lib/governance-audit-chain.js';
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL
 });
 
 // === Fixed Protection Categories ===
@@ -41,10 +35,27 @@ const TRIGGER_BASED = [
 ];
 
 const SENSITIVE_KEYWORDS = [
-  'chain', 'audit', 'log', 'governance', 'security', 
+  'chain', 'audit', 'log', 'governance', 'security',
   'provenance', 'evidence', 'intel', 'immune', 'policy',
   'threat', 'zero_trust', 'canary', 'byok', 'sovereign_key'
 ];
+
+async function sendAlert(message) {
+  const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.warn('[WARN] ALERT_WEBHOOK_URL is not set. Alerts will only be printed to stdout.');
+    return;
+  }
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: `🚨 **Governance Alert**\n\`\`\`${message}\`\`\`` })
+    });
+  } catch (e) {
+    console.error('[ERROR] Failed to send alert to webhook:', e.message);
+  }
+}
 
 async function getRegisteredTables() {
   const result = await pool.query(`SELECT table_name FROM governance_protection_registry`);
@@ -53,10 +64,10 @@ async function getRegisteredTables() {
 
 async function checkRuleExists(tableName) {
   const result = await pool.query(`
-    SELECT COUNT(*) as count 
-    FROM pg_rules 
-    WHERE schemaname = 'public' 
-      AND tablename = $1 
+    SELECT COUNT(*) as count
+    FROM pg_rules
+    WHERE schemaname = 'public'
+      AND tablename = $1
       AND rulename IN ($2, $3)
   `, [tableName, `${tableName}_no_update`, `${tableName}_no_delete`]);
   return parseInt(result.rows[0].count) === 2;
@@ -64,11 +75,11 @@ async function checkRuleExists(tableName) {
 
 async function checkTriggerExists(tableName) {
   const result = await pool.query(`
-    SELECT COUNT(*) as count 
-    FROM information_schema.triggers 
-    WHERE event_object_schema = 'public' 
-      AND event_object_table = $1 
-      AND trigger_name LIKE 'trg_prevent_%'
+    SELECT COUNT(*) as count
+    FROM information_schema.triggers
+    WHERE event_object_schema = 'public'
+      AND event_object_table = $1
+      AND (trigger_name LIKE 'trg_prevent_%' OR trigger_name LIKE '%_lifecycle_trigger')
   `, [tableName]);
   return parseInt(result.rows[0].count) > 0;
 }
@@ -81,7 +92,7 @@ async function registerNewTable(tableName) {
 
   if (exists.rows.length === 0) {
     await pool.query(
-      `INSERT INTO governance_protection_registry (table_name, priority_level, status) 
+      `INSERT INTO governance_protection_registry (table_name, priority_level, status)
        VALUES ($1, 'medium', 'pending_review')`,
       [tableName]
     );
@@ -91,7 +102,7 @@ async function registerNewTable(tableName) {
 }
 
 async function runGovernanceMonitor() {
-  console.log('=== TRINKIA GOVERNANCE MONITOR v4.0 ===\n');
+  console.log('=== TRUNKIA GOVERNANCE MONITOR v4.1 ===\n');
 
   const registeredTables = await getRegisteredTables();
 
@@ -110,11 +121,10 @@ async function runGovernanceMonitor() {
     }
   }
 
-  // Discover new sensitive tables
   const discoveryQuery = `
-    SELECT table_name 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
       AND table_type = 'BASE TABLE'
       AND (${SENSITIVE_KEYWORDS.map(k => `table_name LIKE '%${k}%'`).join(' OR ')})
       AND table_name NOT IN (SELECT table_name FROM governance_protection_registry)
@@ -143,7 +153,9 @@ async function runGovernanceMonitor() {
   }
 
   if (tamperDetected > 0 || newlyRegistered > 0) {
+    const alertMsg = `Action Required:\nTamper Events: ${tamperDetected}\nNew Tables: ${newlyRegistered}\nMissing: ${missingProtection.join(', ')}`;
     console.log('⚠️  Action Required');
+    await sendAlert(alertMsg);
   } else {
     console.log('✅ System Status: Healthy');
   }
@@ -156,6 +168,10 @@ async function runGovernanceMonitor() {
   });
 }
 
-runGovernanceMonitor()
-  .catch(err => console.error('FATAL ERROR:', err.message))
-  .finally(async () => await pool.end());
+export { runGovernanceMonitor };
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runGovernanceMonitor()
+    .catch(err => console.error('FATAL ERROR:', err.message))
+    .finally(async () => await pool.end());
+}

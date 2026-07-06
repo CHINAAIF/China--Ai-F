@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; import pg from 'pg'; dotenv.config();
-import { pool } from './db-learning.js';
+import dotenv from 'dotenv'; import pg from 'pg'; import { pool } from './db-learning.js';
 class ReputationAgent{
   constructor(){this.name='reputation_updater';this.version='1.0.0';}
   async updateReputation(){

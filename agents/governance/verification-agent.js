@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'; dotenv.config();
-import { pool } from './db-governance.js';
+import dotenv from 'dotenv'; import { pool } from './db-governance.js';
 import Groq from 'groq-sdk';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });

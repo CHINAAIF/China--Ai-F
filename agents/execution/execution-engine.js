@@ -1,10 +1,8 @@
 /**
  * TRUNKIA Execution Engine v1.0 — Dark Factory
  */
-import dotenv from 'dotenv';
 import pg from 'pg';
-dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl: true});
 
 class ExecutionEngine {
   constructor(){

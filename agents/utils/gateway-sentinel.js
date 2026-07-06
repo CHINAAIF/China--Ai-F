@@ -1,9 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import crypto from 'crypto';
 import { pool } from './db.js';
 
-const AGENT_SECRET  = process.env.ENCRYPTION_KEY || 'chinaaif-sovereign-secret';
+const AGENT_SECRET  = process.env.ENCRYPTION_KEY;
 const TOKEN_TTL_MS  = 5000; // 5 ثوانٍ فقط
 const usedTokens    = new Map(); // منع إعادة الاستخدام
 

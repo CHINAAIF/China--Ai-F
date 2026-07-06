@@ -1,10 +1,8 @@
 /**
  * TRUNKIA Circuit Breaker v1.0
  */
-import dotenv from 'dotenv';
 import pg from 'pg';
-dotenv.config();
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized: true}});
+const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl: true});
 
 class CircuitBreaker {
   constructor(){
