@@ -36,7 +36,8 @@ describe('Database Immutability Protections (Integration)', () => {
     const client = await pool.connect();
     try {
       const insertRes = await client.query(
-        "INSERT INTO governance_contracts (nonce, content_hash, signature, valid_until, used) VALUES (crypto.randomUUID(), 'hash', 'sig', NOW() + INTERVAL '1 hour', false) RETURNING id;"
+        "INSERT INTO governance_contracts (nonce, content_hash, signature, valid_until, used) VALUES ($1, 'hash', 'sig', NOW() + INTERVAL '1 hour', false) RETURNING id;",
+        [crypto.randomUUID()]
       );
       const contractId = insertRes.rows[0].id;
 

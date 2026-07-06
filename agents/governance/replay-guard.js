@@ -7,7 +7,10 @@ import { logExecution, safeStep } from '../utils/executor.js';
 import pg from 'pg';
 import crypto from 'crypto';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE || process.env.DATABASE_URL, ssl: true });
+const pool = new pg.Pool({ 
+  connectionString: process.env.DATABASE_URL_GOVERNANCE || process.env.DATABASE_URL,
+  ssl: true
+});
 const WINDOW_SECONDS = 30;
 
 class ReplayGuard {
