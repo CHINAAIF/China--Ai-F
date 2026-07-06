@@ -7,8 +7,9 @@ import { logExecution, safeStep } from '../utils/executor.js';
 import pg from 'pg';
 import crypto from 'crypto';
 
+const connectionString = process.env.NODE_ENV === 'test' ? process.env.DATABASE_URL : (process.env.DATABASE_URL_GOVERNANCE || process.env.DATABASE_URL);
 const pool = new pg.Pool({ 
-  connectionString: process.env.DATABASE_URL_GOVERNANCE || process.env.DATABASE_URL,
+  connectionString,
   ssl: true
 });
 const WINDOW_SECONDS = 30;
