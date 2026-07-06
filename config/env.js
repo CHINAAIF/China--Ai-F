@@ -1,34 +1,28 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
- * Enterprise-grade Environment Loader (ESM Compatible)
- * Enforces strict environment separation and Fail-Fast for missing secrets.
- * Auto-executes on import to guarantee env vars are set before dependent modules load.
+ * Enterprise-grade Environment Loader (CI/CD & Railway Compatible)
+ * - Reads .env files if they exist (Local Termux).
+ * - Relies on injected env vars if files are missing (GitHub Actions, Railway).
+ * - Enforces strict Fail-Fast for missing secrets.
  */
 export function loadEnvironment() {
-    const NODE_ENV = process.env.NODE_ENV;
+    const NODE_ENV = process.env.NODE_ENV || 'development';
     
-    // Determine the environment file to load
     const envFile = NODE_ENV === 'production' ? '.env.production' : '.env.staging';
     const envPath = path.resolve(process.cwd(), envFile);
 
-    // Fail-Fast: If the specific env file doesn't exist, halt the system.
-    if (!fs.existsSync(envPath)) {
-        console.error(`[FATAL] Environment file '${envFile}' not found. Refusing to start in an unmanaged state.`);
-        console.error(`[FATAL] Current NODE_ENV is set to: '${NODE_ENV}'. Ensure the file exists.`);
-        process.exit(1);
+    // Load the specific environment file if it exists (for local dev).
+    if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath });
+        console.log(`[INFO] Environment file '${envFile}' loaded.`);
+    } else {
+        console.log(`[INFO] Environment file '${envFile}' not found. Relying on injected environment variables (CI/CD or Railway).`);
     }
 
-    // Load the specific environment file
-    dotenv.config({ path: envPath });
-
-    // Mandatory secrets for the system to function securely
+    // Mandatory secrets validation
     const requiredSecrets = [
         'DATABASE_URL',
         'DATABASE_URL_LEARNING',
@@ -45,13 +39,13 @@ export function loadEnvironment() {
 
     // Fail-Fast: No default secrets allowed. If a secret is missing, crash immediately.
     if (missingSecrets.length > 0) {
-        console.error(`[FATAL] Missing mandatory environment secrets in '${envFile}':`);
+        console.error(`[FATAL] Missing mandatory environment secrets:`);
         missingSecrets.forEach(key => console.error(`  -> ${key}`));
-        console.error(`[FATAL] System cannot start without these secrets. No default secrets will be used.`);
+        console.error(`[FATAL] System cannot start without these secrets.`);
         process.exit(1);
     }
 
-    console.log(`[INFO] Environment '${NODE_ENV}' loaded successfully from ${envFile}. All critical secrets verified.`);
+    console.log(`[INFO] Environment '${NODE_ENV}' verified. All critical secrets are present.`);
 }
 
 // Auto-execute immediately upon import (Side-effect)
