@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { describe, it, expect } from 'vitest';
 import '../config/env.js';
 import pg from 'pg';
@@ -35,7 +36,7 @@ describe('Database Immutability Protections (Integration)', () => {
     const client = await pool.connect();
     try {
       const insertRes = await client.query(
-        "INSERT INTO governance_contracts (nonce, content_hash, signature, valid_until, used) VALUES ('test-nonce-int-6', 'hash', 'sig', NOW() + INTERVAL '1 hour', false) RETURNING id;"
+        "INSERT INTO governance_contracts (nonce, content_hash, signature, valid_until, used) VALUES (crypto.randomUUID(), 'hash', 'sig', NOW() + INTERVAL '1 hour', false) RETURNING id;"
       );
       const contractId = insertRes.rows[0].id;
 
