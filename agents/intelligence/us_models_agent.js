@@ -1,9 +1,8 @@
-import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; 
+import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
 const pool = getPool('intelligence');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class USModelsAgent {
   constructor() {
@@ -19,7 +18,6 @@ class USModelsAgent {
   }
 
   async run(input = {}) {
-    const startedAt = new Date();
     try {
       const vendorRows = await pool.query(
         'SELECT id, slug FROM vendors WHERE slug = ANY($1)',
@@ -60,27 +58,20 @@ class USModelsAgent {
   "confidence": 80
 }`;
 
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 2000,
-      });
+      // استخدام البوابة الموحدة والتحقق التلقائي
+      const inferenceResult = await safeGroqJSON(prompt, 'You are an AI intelligence analyst.', this.name);
 
-      let result;
-      try {
-        const text = completion.choices[0].message.content;
-        const clean = text.replace(/```json|\n|```/g, '').trim();
-        result = JSON.parse(clean);
-      } catch(e) {
-        throw new Error('JSON parse failed: ' + e.message);
+      if (inferenceResult.error || !inferenceResult.data) {
+        throw new Error(inferenceResult.error || 'Inference failed or no data returned');
       }
+
+      const result = inferenceResult.data;
 
       let inserted = 0;
       for (const signal of (result.signals || [])) {
         try {
           await pool.query(`
-            INSERT INTO intelligence_raw 
+            INSERT INTO intelligence_raw
               (agent_name, content_type, raw_content, title, confidence, filter_status, signals)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
           `, [
@@ -92,15 +83,12 @@ class USModelsAgent {
             'pending',
             JSON.stringify({ vendor: signal.vendor, model: signal.model_slug, impact: signal.impact_level })
           ]);
-          inserted++;
-        } catch(e) {
+          inserted++;                                                                                                                       } catch(e) {
           console.warn('insert signal failed:', e.message);
         }
       }
-
-      await pool.query(`
-        INSERT INTO agent_execution_logs (agent_name, action, input, output, confidence, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
+                                                                                                                                          await pool.query(`
+        INSERT INTO agent_execution_logs (agent_name, action, input, output, confidence, status)                                            VALUES ($1, $2, $3, $4, $5, $6)
       `, [
         this.name, 'run',
         JSON.stringify({ vendors: this.vendors }),
@@ -125,4 +113,3 @@ class USModelsAgent {
 }
 
 export const usModelsAgent = new USModelsAgent();
-export default usModelsAgent;
