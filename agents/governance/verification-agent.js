@@ -1,7 +1,6 @@
-import dotenv from 'dotenv'; import { pool } from './db-governance.js';
-import Groq from 'groq-sdk';
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+import dotenv from 'dotenv'; 
+import { pool } from './db-governance.js';
+import { multiModel } from './multi-model.js';
 
 async function runStandalone() {
   console.log('⚖️ Verification Agent Starting...');
@@ -15,20 +14,17 @@ async function runStandalone() {
 
   for (const item of pending) {
     try {
-      const result = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{
-          role: 'system',
-          content: 'You are a strict AI fact-checker for China AI intelligence. Verify accuracy and return JSON only.'
-        }, {
-          role: 'user',
-          content: `Verify this intelligence: Title: "${item.title}" Content: "${item.content?.substring(0,300)}" Return JSON: {"verified":true/false,"confidence":0-100,"reason":"...","corrected_title":"...","corrected_content":"...","final_importance":1-10}`
-        }],
-        max_tokens: 400,
-        temperature: 0.1,
-      });
+      const systemPrompt = 'You are a strict AI fact-checker for China AI intelligence. Verify accuracy and return JSON only.';
+      const userPrompt = `Verify this intelligence: Title: "${item.title}" Content: "${item.content?.substring(0,300)}" Return JSON: {"verified":true/false,"confidence":0-100,"reason":"...","corrected_title":"...","corrected_content":"...","final_importance":1-10}`;
+      
+      // استخدام البوابة الموحدة بدلاً من Groq مباشرة
+      const result = await multiModel.runSingle('verification', userPrompt, systemPrompt);
 
-      const raw = result.choices[0].message.content.replace(/```json|```/g, '').trim();
+      if (!result?.approved || !result.content) {
+        throw new Error('Inference failed or no content returned.');
+      }
+
+      const raw = result.content.replace(/```json|```/g, '').trim();
       const data = JSON.parse(raw);
 
       if (data.verified && data.confidence >= 60) {
@@ -56,7 +52,6 @@ async function runStandalone() {
 // ── export للـregistry/scheduler ────────────────────────────────
 export async function run(input = {}) {
   try {
-    // عند الاستدعاء من scheduler: شغّل نسخة مخففة بدون pool.end()
     const { rows: pending } = await pool.query(`
       SELECT COUNT(*) as cnt FROM intelligence_raw
       WHERE is_verified=false AND is_published=false
