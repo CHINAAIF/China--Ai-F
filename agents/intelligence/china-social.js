@@ -3,11 +3,8 @@ import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { brain } from '../brain.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-const { Pool } = pg;
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL_INTELLIGENCE, 
-  ssl: true 
-});
+
+const pool = getPool('intelligence');
 
 export class ChinaSocialAgent {
   constructor() {
