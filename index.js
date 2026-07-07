@@ -42,6 +42,24 @@ app.set('trust proxy', 1);
 /* ===== OBSERVABILITY: Sentry Request Handler ===== */
 app.use(Sentry.Handlers.requestHandler());
 
+/* ===== SECURITY: Cloudflare Real IP Extraction (Zero-Trust) ===== */
+// يستخرج IP الحقيقي للمستخدم من Cloudflare لضمان عمل Rate Limiting وتتبع المهاجمين بدقة
+app.use((req, res, next) => {
+  const cfIp = req.headers['cf-connecting-ip'];
+  const xff = req.headers['x-forwarded-for'];
+  
+  if (cfIp) {
+    req.realIp = cfIp;
+    req.ip = cfIp; // Override Express IP for rate limiters
+  } else if (xff) {
+    req.realIp = xff.split(',')[0].trim();
+    req.ip = req.realIp;
+  } else {
+    req.realIp = req.socket.remoteAddress;
+  }
+  next();
+});
+
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
