@@ -1,9 +1,9 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import pg from 'pg';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; 
+import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
-import { pool } from './db-learning.js';
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const pool = getPool('learning');
 
 class GroundTruthValidator {
   constructor() {
@@ -32,8 +32,7 @@ class GroundTruthValidator {
   }
 
   async run(input = {}) {
-    try {
-      // 1. جلب intelligence_verified غير منشور للتحقق
+    try {                                                                                                                                 // 1. جلب intelligence_verified غير منشور للتحقق
       const items = await pool.query(`
         SELECT iv.id, iv.raw_id, iv.verified_content, iv.impact_level,
                ir.agent_name, ir.title, ir.confidence, ir.signals
@@ -76,20 +75,14 @@ class GroundTruthValidator {
   "impact_confirmed": "low|medium|high|critical"
 }`;
 
-          const completion = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.1,
-            max_tokens: 500,
-          });
+          // استخدام البوابة الموحدة والتحقق التلقائي
+          const inferenceResult = await safeGroqJSON(prompt, 'You are a fact-checking AI analyst.', this.name);
 
-          let verdict;
-          try {
-            const text = completion.choices[0].message.content;
-            const clean = text.replace(/```json|```/g, '').trim();
-            verdict = JSON.parse(clean);
-          } catch(e) { throw new Error('JSON parse failed: ' + e.message); }
+          if (inferenceResult.error || !inferenceResult.data) {
+            throw new Error(inferenceResult.error || 'Inference failed or no data returned');
+          }
 
+          const verdict = inferenceResult.data;
           validated++;
 
           if (verdict.should_publish && verdict.is_valid) {
@@ -130,8 +123,7 @@ class GroundTruthValidator {
       try {
         await pool.query(`
           INSERT INTO agent_execution_logs (agent_name, action, input, output, confidence, status)
-          VALUES ($1,$2,$3,$4,$5,$6)
-        `, [this.name,'validate','{}',JSON.stringify({error:e.message}),0,'failed']);
+          VALUES ($1,$2,$3,$4,$5,$6)                                                                                                        `, [this.name,'validate','{}',JSON.stringify({error:e.message}),0,'failed']);
       } catch(_) {}
       return { success: false, error: e.message };
     }
@@ -144,4 +136,3 @@ class GroundTruthValidator {
 }
 
 export const groundTruthValidator = new GroundTruthValidator();
-export default groundTruthValidator;
