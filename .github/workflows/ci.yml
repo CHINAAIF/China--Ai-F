@@ -73,8 +73,6 @@ jobs:
             --report-path gitleaks-results.sarif \
             --no-banner \
             --redact
-          # gitleaks exit codes: 0 = no leaks, 1 = leaks found, 2 = error
-          # We capture the exit code via continue-on-error + steps.gitleaks.outcome
 
       - name: Verify Gitleaks SARIF was generated
         if: always()
@@ -86,17 +84,31 @@ jobs:
             exit 1
           fi
 
+      # -------------------------------------------------------------------------
+      # Semgrep via CLI (not the Docker action — same filesystem isolation issue
+      # as gitleaks-action; also semgrep-action@v1 runs `semgrep ci` by default
+      # which requires SEMGREP_APP_TOKEN. We use `semgrep scan` for local-only
+      # mode without cloud dependency).
+      # -------------------------------------------------------------------------
+      - name: Install Semgrep CLI
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install semgrep
+          semgrep --version
+
       - name: Semgrep — SAST (JS/Node + OWASP Top 10 + misconfig)
         id: semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/javascript
-            p/nodejs
-            p/owasp-top-ten
-            p/r2c-bug-scan
-            p/react-best-practices
-          args: --sarif --output=semgrep.sarif
+        continue-on-error: true    # we want SARIF upload to happen even if findings found
+        run: |
+          semgrep scan \
+            --config p/javascript \
+            --config p/nodejs \
+            --config p/owasp-top-ten \
+            --config p/r2c-bug-scan \
+            --config p/react-best-practices \
+            --sarif --output semgrep.sarif \
+            --no-git-ignore \
+            --error
 
       - name: Verify Semgrep SARIF was generated
         if: always()
@@ -122,11 +134,17 @@ jobs:
           sarif_file: gitleaks-results.sarif
           category: gitleaks
 
-      # Final gate: fail the job if gitleaks found leaks (after SARIF upload)
+      # Final gates: fail the job if either tool found issues (after SARIF upload)
       - name: Fail job if Gitleaks found leaks
         if: steps.gitleaks.outcome == 'failure'
         run: |
           echo "::error::Gitleaks found secrets in the repository — see Security tab for details"
+          exit 1
+
+      - name: Fail job if Semgrep found findings
+        if: steps.semgrep.outcome == 'failure'
+        run: |
+          echo "::error::Semgrep found security findings — see Security tab for details"
           exit 1
 
   # ===========================================================================
