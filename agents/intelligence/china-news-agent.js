@@ -1,7 +1,7 @@
-import dotenv from 'dotenv'; import { pool } from './db-intelligence.js';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const pool = getPool('intelligence');
 
 async function runStandalone() {
   console.log('📰 China News Agent Starting...');
@@ -19,18 +19,16 @@ async function runStandalone() {
   let totalProcessed = 0;
   for (const topic of topics) {
     try {
-      const result = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{
-          role: 'user',
-          content: `Search and summarize latest news about: ${topic}. Return JSON: {"title":"...","summary":"...","importance":1-10,"sentiment":"positive|negative|neutral"}`
-        }],
-        max_tokens: 300,
-        temperature: 0.3,
-      });
+      const prompt = `Search and summarize latest news about: ${topic}. Return JSON: {"title":"...","summary":"...","importance":1-10,"sentiment":"positive|negative|neutral"}`;
+      
+      // استخدام البوابة الموحدة والتحقق التلقائي
+      const result = await safeGroqJSON(prompt, 'You are a helpful AI news assistant.', 'china_news_agent');
 
-      const raw = result.choices[0].message.content.replace(/```json|```/g, '').trim();
-      const data = JSON.parse(raw);
+      if (result.error || !result.data) {
+        throw new Error(result.error || 'Inference failed');
+      }
+
+      const data = result.data;
 
       await pool.query(
         `INSERT INTO intelligence_raw (agent_name, content_type, raw_content, title, category, importance_score, sentiment, is_verified, collected_at)
