@@ -8,14 +8,16 @@ COPY . .
 # Stage 2: Production
 FROM node:22-alpine
 WORKDIR /app
-# نسخ ملفات الإنتاج من مرحلة البناء فقط
+# نسخ الملفات من مرحلة البناء
 COPY --from=builder /app ./
-# تفعيل وضع الإنتاج
+# إنشاء مستخدم عادي وتغيير الملكية (الأمان السيبراني: لا تعمل بصلاحيات root أبداً)
+RUN chown -R node:node /app
+USER node
+
 ENV NODE_ENV=production
-# فتح البورت الداخلي
 EXPOSE 8080
-# تفعيل فحص الصحة للتأكد أن الحاوية لا تزال تستجيب
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8080/api/system/pulse || exit 1
-# أمر التشغيل
+
 CMD ["node", "index.js"]

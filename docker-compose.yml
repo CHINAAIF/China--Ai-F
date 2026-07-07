@@ -3,7 +3,7 @@ version: '3.8'
 services:
   trunkia-api:
     # نسحب الحاوية الجاهزة من GHCR بدلاً من بنائها محلياً
-    image: ghcr.io/chinaaif/china-ai-f:latest
+    image: ghcr.io/chinaaif/china-ai-f:main
     container_name: trunkia-app
     restart: unless-stopped
     expose:
@@ -16,7 +16,7 @@ services:
       - trunkia-net
 
   trunkia-worker:
-    image: ghcr.io/chinaaif/china-ai-f:latest
+    image: ghcr.io/chinaaif/china-ai-f:main
     container_name: trunkia-worker
     restart: unless-stopped
     command: ["node", "worker.js"]
