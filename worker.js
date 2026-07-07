@@ -13,7 +13,7 @@ console.log('[WORKER] Starting TRUNKIA Inference Worker...');
 const worker = new Worker('inference', async (job) => {
   console.log(`[WORKER] Processing job ${job.id}...`);
   
-  const { payload } = job.data;
+  const payload = job.data;
   
   // استدعاء دالة الاستدلال الحقيقية الموجودة في نظامك
   const result = await handleSovereignInference(payload);
