@@ -6,10 +6,14 @@
   "scripts": {
     "start:staging": "NODE_ENV=staging node index.js",
     "dev:staging": "NODE_ENV=staging node --watch index.js",
-    "start:production": "NODE_ENV=production node index.js"
+    "start:production": "NODE_ENV=production node index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --reporter=default --reporter=json --outputFile=test-results.json --coverage"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "cors": "^2.8.6",
@@ -22,6 +26,7 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "vitest": "^4.1.9"
   }
 }

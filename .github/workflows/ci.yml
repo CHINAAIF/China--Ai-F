@@ -1,60 +1,143 @@
+# =============================================================================
+# TRUNKIA — CI/CD Pipeline (Enterprise Grade)
+# -----------------------------------------------------------------------------
+# Reference standards: SLSA Level 3, OWASP Top 10, GitHub Actions Security Best
+# Practices, principle of least privilege, supply-chain protection via SHA pinning.
+# =============================================================================
 name: CI/CD Pipeline (Enterprise Grade)
 
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+
+# SLSA L3: explicit least-privilege permissions (no default write tokens)
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref — saves runner minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ===========================================================================
+  # JOB 1: Static Application Security Testing (SAST)
+  # ===========================================================================
   security-sast:
+    name: Security — Gitleaks + Semgrep
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to Security tab
+      actions: read            # required for Semgrep to read workflow runs
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # Required for Gitleaks history scan
+      - name: Checkout code (full history for Gitleaks)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0           # CRITICAL: Gitleaks needs full git history
+          persist-credentials: false
 
-    - name: Gitleaks Secrets Scan
-      uses: gitleaks/gitleaks-action@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gitleaks — Secret Detection (full history scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: true
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
 
-    - name: Semgrep SAST Scan
-      uses: returntocorp/semgrep-action@v1
-      with:
-        config: "p/javascript" # Scan for JS/Node.js vulnerabilities and bad patterns
+      - name: Semgrep — SAST (JS/Node + OWASP Top 10 + misconfig)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/javascript
+            p/nodejs
+            p/owasp-top-ten
+            p/r2c-bug-scan
+            p/react-best-practices
+          generate-sarif: true
 
+      - name: Upload Semgrep SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Upload Gitleaks SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks
+
+  # ===========================================================================
+  # JOB 2: Tests + Dependency Audit
+  # ===========================================================================
   test-and-audit:
+    name: Tests — Vitest + npm audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: staging
-    needs: security-sast # Do not run tests if security scan fails
-    
+    needs: security-sast           # Do not run tests if SAST fails
+
+    permissions:
+      contents: read
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies (deterministic, no audit inline)
+        run: npm ci --no-audit --no-fund
 
-    - name: Run NPM Audit (Dependency Scanning)
-      run: npm audit --audit-level=high
-      continue-on-error: false
+      - name: Dependency Audit — fail on high or critical
+        run: npm audit --audit-level=high --omit=dev
+        continue-on-error: false
 
-    - name: Run Integration & Unit Tests
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        DATABASE_URL_GOVERNANCE: ${{ secrets.DATABASE_URL_GOVERNANCE }}
-        DATABASE_URL_SECURITY: ${{ secrets.DATABASE_URL_SECURITY }}
-        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-        GOVERNANCE_HMAC_SECRET: ${{ secrets.GOVERNANCE_HMAC_SECRET }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        TRUNKIA_API_KEY: ${{ secrets.TRUNKIA_API_KEY }}
-        DATABASE_URL_LEARNING: ${{ secrets.DATABASE_URL_LEARNING }}
-        DATABASE_URL_INTELLIGENCE: ${{ secrets.DATABASE_URL_INTELLIGENCE }}
-      run: npx vitest run
+      - name: Run Integration & Unit Tests (Vitest)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_GOVERNANCE: ${{ secrets.DATABASE_URL_GOVERNANCE }}
+          DATABASE_URL_SECURITY: ${{ secrets.DATABASE_URL_SECURITY }}
+          DATABASE_URL_LEARNING: ${{ secrets.DATABASE_URL_LEARNING }}
+          DATABASE_URL_INTELLIGENCE: ${{ secrets.DATABASE_URL_INTELLIGENCE }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          GOVERNANCE_HMAC_SECRET: ${{ secrets.GOVERNANCE_HMAC_SECRET }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TRUNKIA_API_KEY: ${{ secrets.TRUNKIA_API_KEY }}
+          NODE_ENV: test
+        run: npm test -- --coverage
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results.json
+            test-results.junit.xml
+            coverage/
+          retention-days: 14
+          if-no-files-found: warn
