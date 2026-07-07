@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  trunkia-api:
+    build: .
+    container_name: trunkia-app
+    restart: unless-stopped
+    # Zero Ports: لا نقوم بتعريض أي بورت للإنترنت. 
+    # التطبيق يسمح بالوصول فقط من داخل شبكة Docker.
+    expose:
+      - "8080"
+    env_file:
+      - .env.production
+    networks:
+      - trunkia-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: trunkia-tunnel
+    restart: unless-stopped
+    # تشغيل النفق باستخدام التوكن الذي سنوفره
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - trunkia-api
+    networks:
+      - trunkia-net
+
+networks:
+  trunkia-net:
+    driver: bridge
