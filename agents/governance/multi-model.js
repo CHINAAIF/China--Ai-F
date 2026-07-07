@@ -1,233 +1,158 @@
 import Groq from 'groq-sdk';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
-const AVAILABLE_MODELS = {
-  groq: !!process.env.GROQ_API_KEY,
-  gemini: !!process.env.GEMINI_API_KEY,
-  deepseek: !!process.env.DEEPSEEK_API_KEY,
-  mistral: !!process.env.MISTRAL_API_KEY,
-  qwen: !!process.env.QWEN_API_KEY,
-  ernie: !!process.env.ERNIE_API_KEY,
-  cohere: !!process.env.COHERE_API_KEY
-};
 
-class MultiModelRouter {
+/**
+ * TRUNKIA Enterprise Inference Gateway
+ * Implements Circuit Breakers, Latency Tracking, and Smart Failover.
+ */
+
+class ProviderState {
+  constructor(name, client, models, priority) {
+    this.name = name;
+    this.client = client;
+    this.models = models;
+    this.priority = priority; // 1 = highest
+    this.failures = 0;
+    this.lastFailure = 0;
+    this.latency = 1000; // EMA Latency in ms
+    this.circuitOpen = false;
+  }
+
+  recordSuccess(latency) {
+    this.failures = 0;
+    this.circuitOpen = false;
+    // Exponential Moving Average for latency (alpha = 0.3)
+    this.latency = (this.latency * 0.7) + (latency * 0.3);
+  }
+
+  recordFailure() {
+    this.failures++;
+    this.lastFailure = Date.now();
+    if (this.failures >= 3) {
+      this.circuitOpen = true;
+      console.warn(`[InferenceGateway] Circuit OPENED for provider ${this.name}`);
+    }
+  }
+
+  isAvailable() {
+    if (this.circuitOpen) {
+      // Half-Open state: try again after 30 seconds
+      if (Date.now() - this.lastFailure > 30000) {
+        this.circuitOpen = false;
+        this.failures = 0;
+        console.log(`[InferenceGateway] Circuit HALF-OPEN for provider ${this.name}. Retrying...`);
+        return true;
+      }
+      return false;
+    }
+    return true;
+  }
+}
+
+class InferenceGateway {
   constructor() {
-    this.groq = AVAILABLE_MODELS.groq
-      ? new Groq({ apiKey: process.env.GROQ_API_KEY })
-      : null;
+    this.providers = [];
+    this.initProviders();
   }
 
-  // النموذج الأنسب للمهمة
-  selectBest(taskType) {
-    if (taskType.includes('chinese') && AVAILABLE_MODELS.qwen) return 'qwen';
-    if (taskType.includes('chinese') && AVAILABLE_MODELS.deepseek) return 'deepseek';
-    if (taskType.includes('baidu') && AVAILABLE_MODELS.ernie) return 'ernie';
-    if (taskType.includes('translation') && AVAILABLE_MODELS.mistral) return 'mistral';
-    if (taskType.includes('reasoning') && AVAILABLE_MODELS.gemini) return 'gemini';
-    return 'groq'; // الافتراضي دائماً
-  }
-
-  async runGroq(prompt, systemPrompt = '') {
-    if (!this.groq) return null;
-    try {
-      const res = await this.groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 1024,
-        temperature: 0.3
-      });
-      return {
-        approved: true,
-        content: res.choices[0].message.content,
-        model: 'groq/llama-3.3-70b',
-        tokens: res.usage?.total_tokens
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
-    }
-  }
-
-  async runGemini(prompt) {
-    if (!AVAILABLE_MODELS.gemini) return null;
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        }
+  initProviders() {
+    // Initialize Groq
+    if (process.env.GROQ_API_KEY) {
+      this.providers.push(
+        new ProviderState(
+          'groq',
+          new Groq({ apiKey: process.env.GROQ_API_KEY }),
+          ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
+          1
+        )
       );
-      const data = await res.json();
-      return {
-        approved: true,
-        content: data.candidates?.[0]?.content?.parts?.[0]?.text,
-        model: 'gemini-1.5-flash'
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
     }
+    // Future providers can be pushed here (Gemini, DeepSeek, etc.)
+    // We keep the structure ready for dynamic scaling.
   }
 
-  async runDeepSeek(prompt) {
-    if (!AVAILABLE_MODELS.deepseek) return null;
-    try {
-      const res = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 1024
-        })
-      });
-      const data = await res.json();
-      return {
-        approved: true,
-        content: data.choices?.[0]?.message?.content,
-        model: 'deepseek-chat'
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
+  getBestProviders(taskType) {
+    // 1. Filter by availability (Circuit Breaker check)
+    let available = this.providers.filter(p => p.isAvailable());
+    
+    if (available.length === 0) {
+      console.error('[InferenceGateway] FATAL: All providers circuits are OPEN!');
+      return [];
     }
-  }
 
-  async runMistral(prompt) {
-    if (!AVAILABLE_MODELS.mistral) return null;
-    try {
-      const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'mistral-small-latest',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 1024
-        })
-      });
-      const data = await res.json();
-      return {
-        approved: true,
-        content: data.choices?.[0]?.message?.content,
-        model: 'mistral-small'
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
-    }
-  }
-
-  async runQwen(prompt) {
-    if (!AVAILABLE_MODELS.qwen) return null;
-    try {
-      const res = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.QWEN_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'qwen-turbo',
-          input: { messages: [{ role: 'user', content: prompt }] }
-        })
-      });
-      const data = await res.json();
-      return {
-        approved: true,
-        content: data.output?.text,
-        model: 'qwen-turbo'
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
-    }
-  }
-
-  async runErnie(prompt) {
-    if (!AVAILABLE_MODELS.ernie) return null;
-    try {
-      const res = await fetch(
-        `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=${process.env.ERNIE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: prompt }]
-          })
-        }
-      );
-      const data = await res.json();
-      return {
-        approved: true,
-        content: data.result,
-        model: 'ernie-speed-128k'
-      };
-    } catch(e) {
-      return { approved: false, error: e.message };
-    }
-  }
-
-  // تشغيل النموذج الأنسب فقط
-  async runSingle(taskType, prompt, systemPrompt = '') {
-    const model = this.selectBest(taskType);
-    switch(model) {
-      case 'qwen': return await this.runQwen(prompt);
-      case 'deepseek': return await this.runDeepSeek(prompt);
-      case 'ernie': return await this.runErnie(prompt);
-      case 'mistral': return await this.runMistral(prompt);
-      case 'gemini': return await this.runGemini(prompt);
-      default: return await this.runGroq(prompt, systemPrompt);
-    }
-  }
-
-  // تشغيل كل النماذج المتاحة للتحكيم
-  async runConsensus(prompt, systemPrompt = '') {
-    const tasks = {
-      groq: this.runGroq(prompt, systemPrompt),
-      gemini: this.runGemini(prompt),
-      deepseek: this.runDeepSeek(prompt),
-      mistral: this.runMistral(prompt),
-      qwen: this.runQwen(prompt),
-      ernie: this.runErnie(prompt)
-    };
-
-    const results = await Promise.allSettled(Object.values(tasks));
-    const keys = Object.keys(tasks);
-    const responses = {};
-    keys.forEach((k, i) => {
-      responses[k] = results[i].status === 'fulfilled' ? results[i].value : null;
+    // 2. Sort by Priority first, then by Latency (fastest first)
+    available.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.latency - b.latency;
     });
 
-    const available = Object.entries(responses)
-      .filter(([_, v]) => v?.approved)
-      .map(([k]) => k);
-
-    return { responses, available };
+    return available;
   }
 
-  status() {
-    return Object.entries(AVAILABLE_MODELS).map(([model, active]) => ({
-      model, active
+  async runSingle(taskType, prompt, systemPrompt = '') {
+    const candidates = this.getBestProviders(taskType);
+    
+    for (const provider of candidates) {
+      const startTime = Date.now();
+      try {
+        let result;
+        if (provider.name === 'groq') {
+          result = await this._executeGroq(provider, prompt, systemPrompt);
+        }
+        // Add other providers execution here
+
+        const latency = Date.now() - startTime;
+        provider.recordSuccess(latency);
+        
+        return {
+          approved: true,
+          content: result.content,
+          model: `${provider.name}/${result.model}`,
+          tokens: result.tokens,
+          latency_ms: latency
+        };
+
+      } catch (err) {
+        const latency = Date.now() - startTime;
+        provider.recordFailure();
+        console.error(`[InferenceGateway] Provider ${provider.name} failed in ${latency}ms: ${err.message}`);
+        // Continue to next provider (Failover)
+      }
+    }
+
+    // If we reach here, all providers failed
+    return { approved: false, error: 'All inference providers failed or circuits are open.' };
+  }
+
+  async _executeGroq(provider, prompt, systemPrompt) {
+    const model = provider.models[0]; // Default to first model
+    const res = await provider.client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 1024,
+      temperature: 0.3
+    });
+
+    return {
+      content: res.choices[0].message.content,
+      model: model,
+      tokens: res.usage?.total_tokens
+    };
+  }
+
+  getHealthStatus() {
+    return this.providers.map(p => ({
+      name: p.name,
+      available: p.isAvailable(),
+      failures: p.failures,
+      circuit_open: p.circuitOpen,
+      avg_latency_ms: Math.round(p.latency)
     }));
   }
 }
 
-
-export const multiModel = new MultiModelRouter();
+// Export as singleton to maintain state across the application
+export const multiModel = new InferenceGateway();
 export default multiModel;
-
-
-// ── auto-fix: run() wrapper ──────────────────────────────────────
-export async function run(input = {}) {
-  try {
-    return { success: true, data: { agent: 'multi-model', status: 'ok', input } };
-  } catch(e) {
-    return { success: false, error: e.message };
-  }
-}
