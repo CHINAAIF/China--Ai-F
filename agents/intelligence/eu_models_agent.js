@@ -1,9 +1,8 @@
-import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; 
+import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
 const pool = getPool('intelligence');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class EUModelsAgent {
   constructor() {
@@ -49,19 +48,14 @@ class EUModelsAgent {
   "confidence": 75
 }`;
 
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1500,
-      });
+      // استخدام البوابة الموحدة والتحقق التلقائي
+      const inferenceResult = await safeGroqJSON(prompt, 'You are an AI intelligence analyst.', this.name);
 
-      let result;
-      try {
-        const text = completion.choices[0].message.content;
-        const clean = text.replace(/```json|```/g, '').trim();
-        result = JSON.parse(clean);
-      } catch(e) { throw new Error('JSON parse failed: ' + e.message); }
+      if (inferenceResult.error || !inferenceResult.data) {
+        throw new Error(inferenceResult.error || 'Inference failed or no data returned');
+      }
+
+      const result = inferenceResult.data;
 
       let inserted = 0;
       for (const signal of (result.signals || [])) {
@@ -99,4 +93,3 @@ class EUModelsAgent {
 }
 
 export const euModelsAgent = new EUModelsAgent();
-export default euModelsAgent;
