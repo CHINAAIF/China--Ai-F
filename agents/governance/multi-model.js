@@ -151,6 +151,56 @@ class InferenceGateway {
       avg_latency_ms: Math.round(p.latency)
     }));
   }
+
+  /**
+   * توجيه طلب إلى مزود ونموذج محدد بالاسم (يُستخدم لمحرك اختبار الأداء)
+   */
+  async runSpecificModel(providerName, modelName, prompt, systemPrompt = '') {
+    const provider = this.providers.find(p => p.name === providerName && p.client);
+    if (!provider || !provider.isAvailable()) {
+      throw new Error(`Provider ${providerName} not available or circuit open.`);
+    }
+
+    const startTime = Date.now();
+    try {
+      const res = await provider.client.chat.completions.create({
+        model: modelName,
+        messages: [
+          { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 1024,
+        temperature: 0.3
+      });
+
+      const latency = Date.now() - startTime;
+      provider.recordSuccess(latency);
+
+      return {
+        approved: true,
+        content: res.choices?.[0]?.message?.content,
+        model: `${providerName}/${modelName}`,
+        tokens: res.usage?.total_tokens,
+        latency_ms: latency
+      };
+    } catch (err) {
+      provider.recordFailure();
+      throw err;
+    }
+  }
+
+  /**
+   * يُرجع قائمة بكل المزودين والنماذج المُهيأة (للمحرك الاختبار)
+   */
+  getAllAvailableModels() {
+    let models = [];
+    this.providers.forEach(p => {
+      if (p.client) {
+        p.models.forEach(m => models.push({ provider: p.name, model: m }));
+      }
+    });
+    return models;
+  }
 }
 
 // Export as singleton to maintain state across the application

@@ -1,24 +1,17 @@
 import { getPool } from '../../lib/db.js';
-import Groq from 'groq-sdk';
 import crypto from 'crypto';
+import { multiModel } from '../governance/multi-model.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
 var pool = getPool('intelligence');
-var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 var BENCHMARK_DOMAINS = ['financial', 'policy', 'analysis', 'content', 'pricing'];
-
-var BENCHMARK_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'meta-llama/llama-4-scout-17b-16e-instruct'
-];
 
 var DOMAIN_QUESTIONS = {
   financial: [
     'ما هو الفرق بين P/E ratio و P/B ratio في تقييم الشركات؟ أجب بـJSON: {answer: "...", key_points: [...], confidence: 0-100}',
     'ما هي تأثيرات رفع سعر الفائدة على سوق الأسهم؟ أجب بـJSON: {answer: "...", key_points: [...], confidence: 0-100}',
-    'اشرح مفهوم现金流 حر (Free Cash Flow) وأهميته. أجب بـJSON: {answer: "...", key_points: [...], confidence: 0-100}'
+    'اشرح مفهوم التدفق النقدي الحر (Free Cash Flow) وأهميته. أجب بـJSON: {answer: "...", key_points: [...], confidence: 0-100}'
   ],
   policy: [
     'ما هي أبرز قوانين تنظيم الذكاء الاصطناعي في الاتحاد الأوروبي؟ أجب بـJSON: {answer: "...", key_points: [...], confidence: 0-100}',
@@ -42,33 +35,18 @@ var DOMAIN_QUESTIONS = {
   ]
 };
 
-function hashText(text) {
-  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
-}
-
 function extractConfidence(parsed) {
   var raw = Number(parsed && parsed.confidence);
   if (!parsed || parsed.confidence === undefined || parsed.confidence === null || isNaN(raw)) return 75;
   return Math.min(100, Math.max(0, Math.round(raw <= 1 ? raw * 100 : raw)));
 }
 
-function extractLatency(start) {
-  return Date.now() - start;
-}
-
-async function callModel(prompt, modelKey, temp) {
+async function callModel(prompt, providerName, modelKey, temp) {
   var start = Date.now();
   try {
-    var res = await groq.chat.completions.create({
-      model: modelKey,
-      messages: [
-        { role: 'system', content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: temp || 0.3,
-      max_tokens: 800
-    });
-    var raw = res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content ? res.choices[0].message.content : '';
+    // استخدام البوابة الموحدة لاستدعاء نموذج محدد
+    var res = await multiModel.runSpecificModel(providerName, modelKey, prompt, 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation.');
+    var raw = res.content || '';
     var clean = raw.replace(/```json|```/g, '').trim();
     var parsed;
     try {
@@ -82,7 +60,7 @@ async function callModel(prompt, modelKey, temp) {
       success: true,
       data: parsed,
       confidence: extractConfidence(parsed),
-      latency_ms: extractLatency(start),
+      latency_ms: Date.now() - start,
       error: null
     };
   } catch(e) {
@@ -90,14 +68,13 @@ async function callModel(prompt, modelKey, temp) {
       success: false,
       data: null,
       confidence: 0,
-      latency_ms: extractLatency(start),
+      latency_ms: Date.now() - start,
       error: e.message
     };
   }
 }
 
 function compareResponses(responses) {
-  // Simple overlap comparison of top-level keys
   var allKeys = [];
   var keySets = [];
   for (var i = 0; i < responses.length; i++) {
@@ -155,22 +132,25 @@ class ModelBenchmarkingEngine {
     }
   }
 
-  // Run one question against all models
+  // Run one question against all available models in the gateway
   async benchmarkQuestion(question, domain) {
     var taskId = crypto.randomUUID();
     var results = {};
     var responses = [];
 
-    for (var i = 0; i < BENCHMARK_MODELS.length; i++) {
-      var modelKey = BENCHMARK_MODELS[i];
-      var result = await callModel(question, modelKey, 0.3);
+    // قراءة النماذج المتاحة ديناميكياً من البوابة
+    var availableModels = multiModel.getAllAvailableModels();
+    
+    for (var i = 0; i < availableModels.length; i++) {
+      var { provider, model } = availableModels[i];
+      var modelKey = `${provider}/${model}`;
+      var result = await callModel(question, provider, model, 0.3);
       results[modelKey] = result;
       responses.push(result);
     }
 
     var agreement = compareResponses(responses);
 
-    // Find consensus: if 2+ models agree on key points
     var successfulResults = responses.filter(function(r) { return r.success; });
     var avgConfidence = successfulResults.length > 0
       ? Math.round(successfulResults.reduce(function(a, r) { return a + r.confidence; }, 0) / successfulResults.length)
@@ -179,19 +159,15 @@ class ModelBenchmarkingEngine {
       ? Math.round(successfulResults.reduce(function(a, r) { return a + r.latency_ms; }, 0) / successfulResults.length)
       : 0;
 
-    // Write to model_consensus
     try {
       var consensusData = {
-        groq_response: results['llama-3.3-70b-versatile'] ? results['llama-3.3-70b-versatile'].data : null,
-        gemini_response: null,
-        deepseek_response: null,
-        mistral_response: null,
+        models_tested: availableModels.map(m => `${m.provider}/${m.model}`),
         consensus_reached: agreement >= 60,
         consensus_result: {
           agreement_score: agreement,
           avg_confidence: avgConfidence,
           avg_latency_ms: avgLatency,
-          models_tested: BENCHMARK_MODELS.length,
+          models_tested: availableModels.length,
           models_succeeded: successfulResults.length
         },
         disagreement_log: agreement < 60 ? {
@@ -200,7 +176,6 @@ class ModelBenchmarkingEngine {
         } : null
       };
 
-      // Add per-model confidence to disagreement log
       if (agreement < 60) {
         for (var mk in results) {
           consensusData.disagreement_log.per_model_confidence[mk] = {
@@ -213,11 +188,9 @@ class ModelBenchmarkingEngine {
       }
 
       await pool.query(
-        'INSERT INTO model_consensus (task_id, task_type, input_data, groq_response, gemini_response, deepseek_response, mistral_response, consensus_reached, consensus_result, disagreement_log, created_at) VALUES ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9::jsonb,$10::jsonb,NOW())',
+        'INSERT INTO model_consensus (task_id, task_type, input_data, consensus_reached, consensus_result, disagreement_log, created_at) VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6::jsonb,NOW())',
         [
           taskId, domain, JSON.stringify({ question: question }),
-          consensusData.groq_response, consensusData.gemini_response,
-          consensusData.deepseek_response, consensusData.mistral_response,
           consensusData.consensus_reached, consensusData.consensus_result,
           consensusData.disagreement_log
         ]
@@ -231,7 +204,6 @@ class ModelBenchmarkingEngine {
       var r = results[mk2];
       if (!r.success) continue;
       try {
-        // Check if entry exists
         var existing = await pool.query(
           'SELECT id, accuracy_score, sample_count, avg_latency_ms, avg_confidence FROM model_accuracy_registry WHERE model_key=$1 AND domain=$2',
           [mk2, domain]
@@ -239,12 +211,10 @@ class ModelBenchmarkingEngine {
         if (existing.rows.length > 0) {
           var ex = existing.rows[0];
           var newCount = (ex.sample_count || 0) + 1;
-          // Running average
           var newAccuracy = Math.round(((ex.accuracy_score * (ex.sample_count || 1)) + r.confidence) / newCount);
           var newAvgLatency = Math.round(((ex.avg_latency_ms || 0) * (ex.sample_count || 1) + r.latency_ms) / newCount);
           var newAvgConf = Math.round(((ex.avg_confidence || 0) * (ex.sample_count || 1) + r.confidence) / newCount);
 
-          // accuracy_score 0-100 CHECK constraint
           newAccuracy = Math.min(100, Math.max(0, newAccuracy));
           newAvgConf = Math.min(100, Math.max(0, newAvgConf));
 
@@ -273,11 +243,10 @@ class ModelBenchmarkingEngine {
       avg_confidence: avgConfidence,
       avg_latency_ms: avgLatency,
       models_succeeded: successfulResults.length,
-      models_total: BENCHMARK_MODELS.length
+      models_total: availableModels.length
     };
   }
 
-  // Run full benchmark for one domain
   async benchmarkDomain(domain) {
     var questions = DOMAIN_QUESTIONS[domain];
     if (!questions) return { success: false, error: 'unknown_domain:' + domain };
@@ -305,11 +274,9 @@ class ModelBenchmarkingEngine {
     };
 
     await writeEventLog('benchmark_domain_complete', this.name, summary);
-
     return { success: true, summary: summary, results: allResults };
   }
 
-  // Run full benchmark across all domains
   async benchmarkAll() {
     var domainResults = {};
     for (var i = 0; i < BENCHMARK_DOMAINS.length; i++) {
@@ -329,11 +296,9 @@ class ModelBenchmarkingEngine {
     };
 
     await writeEventLog('benchmark_all_complete', this.name, summary);
-
     return { success: true, summary: summary, domains: domainResults };
   }
 
-  // Get current rankings
   async getRankings(domain) {
     try {
       var query = 'SELECT model_key, domain, accuracy_score, sample_count, avg_latency_ms, avg_confidence FROM model_accuracy_registry';
@@ -353,10 +318,11 @@ class ModelBenchmarkingEngine {
   async runDiagnostic() {
     var init = await this.initialize();
     var rankings = await this.getRankings(null);
+    var availableModels = multiModel.getAllAvailableModels();
     return {
       agent: this.name,
       status: init ? 'ok' : this.status,
-      models_available: BENCHMARK_MODELS.length,
+      models_available: availableModels.length,
       domains_available: BENCHMARK_DOMAINS.length,
       total_registry_entries: rankings.success ? rankings.rankings.length : 0,
       timestamp: new Date().toISOString()
