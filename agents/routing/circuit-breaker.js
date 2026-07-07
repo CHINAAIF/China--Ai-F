@@ -1,8 +1,8 @@
 /**
  * TRUNKIA Circuit Breaker v1.0
  */
-import pg from 'pg';
-const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl: true});
+import { getPool } from '../../lib/db.js';
+const pool = getPool('main');
 
 class CircuitBreaker {
   constructor(){

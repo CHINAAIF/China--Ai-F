@@ -1,12 +1,9 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL_GOVERNANCE,
-  ssl: true
-});
+const pool = getPool('governance');
 
 // ── Schema المسموح به لكل نوع بيانات ────────────────────────────
 const ALLOWED_SCHEMAS = {

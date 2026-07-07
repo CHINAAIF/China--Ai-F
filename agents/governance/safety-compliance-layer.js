@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { tableExists } from '../utils/executor.js';
 
@@ -12,17 +12,7 @@ const sslConfig = isProduction
   ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT;
 
 // ── Pool محمي ─────────────────────────────────────────────────
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL_GOVERNANCE,
-  ssl: sslConfig,
-  max: 20,
-  min: 2,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  statement_timeout: 30000,
-  query_timeout: 30000,
-  allowExitOnIdle: false,
-});
+const pool = getPool('governance');
 
 pool.on('error', (err) => console.error('[safety-compliance] Pool error:', err.message));
 

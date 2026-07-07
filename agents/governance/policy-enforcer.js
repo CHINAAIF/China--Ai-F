@@ -3,10 +3,10 @@ import { logExecution, safeStep } from '../utils/executor.js';
  * policy-enforcer | layer: governance
  * FIX FINAL: hash يُحسب على content::text بعد INSERT — يطابق pg دائماً
  */
-import dotenv from 'dotenv'; import pg from 'pg';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
+const pool = getPool('governance');
 
 class PolicyEnforcer {
   constructor() {

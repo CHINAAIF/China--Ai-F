@@ -1,9 +1,9 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 import Groq from 'groq-sdk';
 import crypto from 'crypto';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
 
-var pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_INTELLIGENCE, ssl: true });
+var pool = getPool('intelligence');
 var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 var BENCHMARK_DOMAINS = ['financial', 'policy', 'analysis', 'content', 'pricing'];

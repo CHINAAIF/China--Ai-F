@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 
 const { Pool } = pg;
 

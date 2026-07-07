@@ -1,4 +1,4 @@
-import dotenv from 'dotenv'; import pg from 'pg'; const pool = new pg.Pool({connectionString:process.env.DATABASE_URL_INTELLIGENCE,ssl: true});
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js'; const pool = getPool('intelligence');
 class CostCalcAgent {
   constructor(){this.name='cost_calculator';this.version='1.0.0';}
   async calculate(params){

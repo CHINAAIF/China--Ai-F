@@ -1,4 +1,4 @@
-import pg from 'pg'; import dotenv from 'dotenv'; const pool = new pg.Pool({connectionString:process.env.DATABASE_URL,ssl: true});
+import { getPool } from '../../lib/db.js'; import dotenv from 'dotenv'; const pool = getPool('main');
 class SHAgent{
   async heal(){
     console.log('=== SELF-HEALING ===');

@@ -4,11 +4,11 @@ import { logExecution, safeStep } from '../utils/executor.js';
  * قلب Governance Layer — يختار المزود + يسجل في routing_decisions + event_log
  * العقليات: 3(AI أداة) + 12(Router يوجّه) + 13(Causal) + 14(Temporal) + 18(Anomaly)
  */
-import dotenv from 'dotenv'; import pg from 'pg';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
+const pool = getPool('governance');
 
 class TacticalRouter {
   constructor() {

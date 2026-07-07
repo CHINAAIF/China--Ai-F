@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { brain } from '../brain.js';

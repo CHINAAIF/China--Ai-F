@@ -1,8 +1,8 @@
-import dotenv from 'dotenv'; import pg from 'pg';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { tableExists } from '../utils/executor.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_GOVERNANCE, ssl: true });
+const pool = getPool('governance');
 const MASTER_KEY = process.env.ENCRYPTION_KEY;
 const HEARTBEAT_TIMEOUT_MS = 5 * 60000;
 

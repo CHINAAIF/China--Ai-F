@@ -1,8 +1,8 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import pg from 'pg';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import Groq from 'groq-sdk';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_INTELLIGENCE, ssl: true });
+const pool = getPool('intelligence');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class BenchmarkRunnerAgent {

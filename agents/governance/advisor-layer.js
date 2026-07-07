@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../utils/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../utils/executor.js';
@@ -22,17 +22,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
   ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT;
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL_GOVERNANCE,
-  ssl: sslConfig,
-  max: 20,
-  min: 2,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  statement_timeout: 30000,
-  query_timeout: 30000,
-  allowExitOnIdle: false,
-});
+const pool = getPool('governance');
 
 pool.on('error', (err) => console.error('[advisor-layer] Pool error:', err.message));
 

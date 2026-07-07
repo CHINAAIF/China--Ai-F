@@ -1,4 +1,4 @@
-import dotenv from 'dotenv'; import pg from 'pg';
+import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 
 // ═══════════════════════════════════════════════════════════
@@ -7,10 +7,7 @@ import crypto from 'crypto';
 // العقلية 2: immutable event log
 // ═══════════════════════════════════════════════════════════
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: true
-});
+const pool = getPool('main');
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 

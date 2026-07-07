@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'; import crypto from 'crypto';
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // SOVEREIGN MEMORY ENGINE v2.0
@@ -7,10 +7,7 @@ import pg from 'pg';
 // المعايير: Enterprise-grade RAG Immunization
 // ═══════════════════════════════════════════════════════════════════
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: true
-});
+const pool = getPool('main');
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
