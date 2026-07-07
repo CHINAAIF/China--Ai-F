@@ -1,4 +1,17 @@
 import './config/env.js';
+import * as Sentry from '@sentry/node';
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ 
+    dsn: process.env.SENTRY_DSN, 
+    environment: process.env.NODE_ENV || 'development', 
+    tracesSampleRate: 1.0 
+  });
+  console.log('[INFO] Sentry initialized successfully.');
+} else {
+  console.warn('[WARN] SENTRY_DSN not set. Error tracking is disabled.');
+}
+
 import { runGovernanceMonitor } from './scripts/governance-monitor.js';
 
 import { secureOutput } from "./security_bridge.js";
@@ -25,6 +38,9 @@ dotenv.config();
 
 var app = express();
 app.set('trust proxy', 1);
+
+/* ===== OBSERVABILITY: Sentry Request Handler ===== */
+app.use(Sentry.Handlers.requestHandler());
 
 var PORT = process.env.PORT || 8080;
 var __filename = fileURLToPath(import.meta.url);
@@ -390,6 +406,10 @@ app.post('/api/intelligence/arxiv-scan', async (req, res) => {
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+/* ===== OBSERVABILITY: Sentry Error Handler ===== */
+// يجب أن يكون قبل أي مسار 404 أو معالج أخطاء آخر
+app.use(Sentry.Handlers.errorHandler());
 
 /* ===== 404 HANDLER ===== */
 app.use(function(req, res) {

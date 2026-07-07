@@ -10,7 +10,7 @@ import path from 'path';
  */
 export function loadEnvironment() {
     const NODE_ENV = process.env.NODE_ENV || 'development';
-    
+
     const envFile = NODE_ENV === 'production' ? '.env.production' : '.env.staging';
     const envPath = path.resolve(process.cwd(), envFile);
 
@@ -41,12 +41,20 @@ export function loadEnvironment() {
     if (missingSecrets.length > 0) {
         console.error(`[FATAL] Missing mandatory environment secrets:`);
         missingSecrets.forEach(key => console.error(`  -> ${key}`));
-        console.error(`[FATAL] System cannot start without these secrets.`);
+        console.error(`[FATAL] System cannot start without these secrets.`);                                                                                  
         process.exit(1);
-    }
+    }                                                                                                                                                  
+    
+    // Optional variables (Observability & Alerting)
+    // These do not crash the system if missing, but print a warning.
+    const optionalVars = ['SENTRY_DSN', 'ALERT_WEBHOOK_URL'];
+    optionalVars.forEach(varName => {
+        if (!process.env[varName]) {
+            console.warn(`[WARN] Optional variable ${varName} is not set. Monitoring features may be degraded.`);
+        }
+    });
 
-    console.log(`[INFO] Environment '${NODE_ENV}' verified. All critical secrets are present.`);
-}
-
+    console.log(`[INFO] Environment '${NODE_ENV}' verified. All critical secrets are present.`);                                                       }
+                                                                                                                                                       
 // Auto-execute immediately upon import (Side-effect)
 loadEnvironment();

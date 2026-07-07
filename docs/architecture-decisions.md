@@ -1,16 +1,33 @@
-# Architecture Decision Records (ADRs)
+# قرارات معمارية حي (Architecture Decision Records - ADRs)
 
-## 1. Database Protection: TRIGGER vs RULE
-- **Decision:** Use smart TRIGGERS for tables with legitimate lifecycles, and absolute RULEs for append-only tables.
-- **Reason:** PostgreSQL `RULE` (`ON UPDATE DO INSTEAD NOTHING`) blocks all updates entirely. Application tables like `governance_contracts` require a single legitimate lifecycle transition (`used: false → true`). A RULE breaks the application logic.
-- **Implementation:** A BEFORE UPDATE trigger (`enforce_contract_lifecycle`) was created to allow only this specific transition and raise an exception on any other data tampering. Append-only tables (like `audit_logs`) remain protected by strict RULEs.
+هذا المستند يوثّق القرارات المعمارية والحساسة التي تم اتخاذها خلال بناء وتشغيل نظام TRUNKIA. أي تعديل على هذه القرارات يتطلب مراجعة أمنية وهندسية شاملة.
 
-## 2. Strict Environment & Secrets Management
-- **Decision:** No default secrets allowed. The system uses a Fail-Fast environment loader (`config/env.js`).
-- **Reason:** Hardcoded fallback secrets (e.g., `process.env.KEY || 'dev'`) create massive security vulnerabilities and can cause silent failures in production.
-- **Implementation:** The application checks for mandatory secrets (`DATABASE_URL`, `ENCRYPTION_KEY`, etc.) on startup. If any are missing, the process exits immediately with code 1. Environment isolation is enforced via Neon Branching (Staging vs Production).
+## ADR-001: استراتيجية حماية قاعدة البيانات (RULE vs TRIGGER)
+**السياق:** النظام يتعامل مع نوعين من البيانات الحساسة: سجلات أحداث خالصة (Audit Logs) وجداول لها دورة حياة شرعية (State Machines مثل الحجر الصحي).
+**القرار:** 
+- **RULE-based (`_no_update` + `_no_delete`):** تُستخدم حصراً لسجلات الأحداث والأدلة الخالصة. تعمل بآلية `DO INSTEAD NOTHING` وتمنع أي تحديث أو حذف بصمت.
+- **TRIGGER-based (`trg_prevent_*`):** تُستخدم للجداول التي تحتاج دورة حياة (حالة أولية → قرار نهائي). ترمي استثناء صريح عند محاولة التحديث غير الشرعي.
+**القاعدة الصارمة:** يُمنع منعاً باتاً دمج النوعين على نفس الجدول. إضافة RULE من نوع `_no_update` على جدول يعمل بـ TRIGGER سيُسكت التحديثات الشرعية بصمت ويدمر دورة حياة النظام.
 
-## 3. Row Level Security (RLS) & Least Privilege
-- **Decision:** Enforce RLS on tenant-sensitive tables (`users`, `api_keys`, `sessions`, etc.) and connect using a restricted application role.
-- **Reason:** The default database owner role (`neondb_owner`) has `BYPASSRLS` privileges, rendering RLS policies useless against SQL injection.
-- **Implementation:** Created a dedicated `app_user` role with `NOBYPASSRLS`. RLS policies use session variables (`app.current_user_id`) to ensure strict tenant isolation. Verified empirically via penetration testing (User A sees 1 row, unauthenticated sees 0 rows). Unnecessary `DELETE/UPDATE` privileges were revoked from append-only tables.
+## ADR-002: سياسة "لا أسرار افتراضية أبداً" (No Default Secrets)
+**السياق:** الاعتماد على قيم افتراضية للمفاتيح أو الأسرار في بيئة التطوير يؤدي أحياناً لتسريبها للإنتاج.
+**القرار:** ملف `config/env.js` يطبق سياسة Fail-Fast. إذا نقص أي متغير من قائمة `requiredSecrets`، يتعطل النظام فوراً (`process.exit(1)`). لا توجد قيم افتراضية أو Fallbacks لأي سر تشفيري. المتغيرات الاختيارية (مثل `SENTRY_DSN`) تطبع تحذيراً فقط ولا توقف النظام.
+
+## ADR-003: البقاء على Node.js بالكامل (No Python/Rewrite)
+**السياق:** اقتراحات بإعادة كتابة أجزاء من النظام (خاصة المتعلقة بالذكاء الاصطناعي أو الحماية) بلغة Python بحجة توفر مكتبات أوسع.
+**القرار:** البقاء على Node.js بالكامل لإدارة الـ API، الوكلاء، الحوكمة، والبنية التحتية. الحماية تأتي من التصميم الصحيح (RLS, AppSec, Network Security) وليس من تغيير اللغة. إعادة الكتابة ستفتح سطح هجوم جديداً وتعقد الـ CI/CD. هذا قرار محسوم وليس نقطة نقاش.
+
+## ADR-004: حادثة انقطاع Railway 24 ساعة (Lessons Learned)
+**السياق:** حدث توقف كامل للإنتاج لمدة ~24 ساعة بسبب تحديث `config/env.js` الذي أضاف فحصاً إلزامياً لمتغيرات (`DATABASE_URL_LEARNING/INTELLIGENCE/GOVERNANCE/SECURITY`) دون التأكد من وجودها مسبقاً في لوحة تحكم Railway، ثم حدث خلط عند محاولة الإصلاح.
+**الدرس المستفاد:** 
+1. قبل إضافة أي متغير جديد لقائمة "إلزامي" في `config/env.js`، يجب جلب قائمة كاملة بمتغيرات Railway الحالية ومقارنتها فعلياً.
+2. لا يتم اعتماد أي متغير كـ "إلزامي" إلا إذا كان موجوداً بالفعل في بيئة الإنتاج، أو إذا تم توثيق خطوات إضافته بدقة.
+3. الإصلاحات السريعة للأنظمة الحية (Hotfixes) يجب أن تُراجع من خلال Pull Request ولا تُدفع مباشرة لـ `main`.
+
+## ADR-005: مراقبة الإنتاج (Observability Stack)
+**السياق:** الاعتماد على سجلات الـ Console (stdout) وحدها لا يكفي لرصد الأعطال الصامتة.
+**القرار:** 
+1. دمج **Sentry** (`@sentry/node`) لالتقاط الاستثناءات غير المعالَجة (Uncaught Exceptions) وتتبع مسارات Express.
+2. جدولة `governance-monitor.js` للعمل كل 6 ساعات عبر `node-cron` للتحقق الآلي من سلامة 58+ جدولاً محمياً.
+3. إرسال التنبيهات الحرجة (Tamper Detection) عبر Webhook إلى قنوات العمليات (Slack/Discord) باستخدام `ALERT_WEBHOOK_URL`.
+
