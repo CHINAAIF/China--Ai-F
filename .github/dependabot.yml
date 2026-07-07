@@ -1,5 +1,18 @@
+# =============================================================================
+# TRUNKIA — Dependabot Configuration
+# -----------------------------------------------------------------------------
+# Two ecosystems are tracked:
+#  1. npm            — Node.js dependencies (runtime + dev)
+#  2. github-actions — CI/CD actions pinned to SHAs in .github/workflows/
+#
+# All ecosystems use a 7-day cooldown to avoid supply-chain attacks via
+# newly published malicious packages/versions.
+# =============================================================================
 version: 2
 updates:
+  # -------------------------------------------------------------------------
+  # npm dependencies
+  # -------------------------------------------------------------------------
   - package-ecosystem: "npm"
     cooldown:
       default-days: 7
@@ -7,3 +20,26 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps(npm)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+
+  # -------------------------------------------------------------------------
+  # GitHub Actions (keeps SHA-pinned actions up to date)
+  # -------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    cooldown:
+      default-days: 7
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(ci)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
