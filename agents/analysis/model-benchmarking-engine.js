@@ -1,9 +1,7 @@
 import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
-import Groq from 'groq-sdk';
+import { pool } from '../../lib/db.js';
+import { multiModel } from '../governance/multi-model.js';
 import { pingHeartbeat } from '../utils/heartbeat.js';
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const BENCHMARK_QUESTIONS = {
   'chinese_ai_models': 'ما هي أبرز نماذج الذكاء الاصطناعي الصينية في 2025 ومزاياها التقنية؟ أجب بـ JSON: {models:array,key_differentiators:string,confidence:number}',
@@ -12,14 +10,6 @@ const BENCHMARK_QUESTIONS = {
   'llm_benchmarks':    'ما أفضل نموذج لغوي في مهام الاستدلال المنطقي وفق آخر المعايير؟ أجب بـ JSON: {top_model:string,benchmark_name:string,score:number,confidence:number}',
   'market_intelligence':'ما حجم سوق الذكاء الاصطناعي العالمي وأسرع القطاعات نمواً؟ أجب بـ JSON: {market_size:string,growth_rate:string,top_sectors:array,confidence:number}'
 };
-
-const FREE_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'allam-2-7b',
-  'openai/gpt-oss-120b'
-];
 
 class ModelBenchmarkingEngine {
   constructor() {
@@ -33,20 +23,13 @@ class ModelBenchmarkingEngine {
     catch(e) { this.status='db_error'; return false; }
   }
 
-  async fetchModelAnswer(modelName, question) {
+  async fetchModelAnswer(providerName, modelName, question) {
     const start = Date.now();
     try {
-      const res = await groq.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role:'system', content:'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown.' },
-          { role:'user', content: question }
-        ],
-        temperature: 0.1,
-        max_tokens: 500
-      });
+      // استخدام البوابة الموحدة لاستدعاء نموذج محدد
+      const res = await multiModel.runSpecificModel(providerName, modelName, question, 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown.');
       const latency = Date.now() - start;
-      const raw = res.choices?.[0]?.message?.content || '';
+      const raw = res.content || '';
       const clean = raw.replace(/```json|```/g,'').trim();
       let parsed;
       try { parsed = JSON.parse(clean); }
@@ -126,45 +109,50 @@ class ModelBenchmarkingEngine {
       const results = {};
       let totalTests = 0, totalSuccess = 0;
 
+      // قراءة النماذج المتاحة ديناميكياً من البوابة
+      const availableModels = multiModel.getAllAvailableModels();
+
       for (const [domain, question] of Object.entries(BENCHMARK_QUESTIONS)) {
         results[domain] = {};
         const domainAnswers = [];
         const rawResults = {};
 
-        for (const model of FREE_MODELS) {
+        for (const { provider, model } of availableModels) {
           totalTests++;
-          const r = await this.fetchModelAnswer(model, question);
-          rawResults[model] = r;
+          const modelKey = `${provider}/${model}`;
+          const r = await this.fetchModelAnswer(provider, model, question);
+          rawResults[modelKey] = r;
           if (r.success) domainAnswers.push(r.parsed);
           await new Promise(res => setTimeout(res, 200));
         }
 
-        for (const model of FREE_MODELS) {
-          const r = rawResults[model];
-          if (!r.success) { results[domain][model] = { accuracy:0, error:r.reason }; continue; }
+        for (const modelKey in rawResults) {
+          const r = rawResults[modelKey];
+          if (!r.success) { results[domain][modelKey] = { accuracy:0, error:r.reason }; continue; }
           totalSuccess++;
           const normConf = this.normalizeConfidence(r.parsed.confidence);
           const quality  = this.contentQualityScore(r.parsed);
           const consensus = this.consensusScore(r.parsed, domainAnswers);
           const accuracy = Math.round(0.45*normConf + 0.30*quality + 0.25*consensus);
-          await this.upsertAccuracy(model, domain, accuracy, r.latency, normConf);
-          results[domain][model] = { accuracy, latency: r.latency, confidence: normConf, quality, consensus };
+          await this.upsertAccuracy(modelKey, domain, accuracy, r.latency, normConf);
+          results[domain][modelKey] = { accuracy, latency: r.latency, confidence: normConf, quality, consensus };
         }
       }
 
-      for (const model of FREE_MODELS) {
-        const scores = Object.values(results).map(d=>d[model]).filter(r=>r && r.accuracy>0);
+      for (const { provider, model } of availableModels) {
+        const modelKey = `${provider}/${model}`;
+        const scores = Object.values(results).map(d=>d[modelKey]).filter(r=>r && r.accuracy>0);
         if (scores.length) {
           const avgLat = scores.reduce((a,b)=>a+b.latency,0)/scores.length;
           const successRate = (scores.length/Object.keys(BENCHMARK_QUESTIONS).length)*100;
-          await this.updateModelRegistry(model, avgLat, successRate);
+          await this.updateModelRegistry(modelKey, avgLat, successRate);
         }
       }
 
       const verify = await pool.query(`SELECT model_key,domain,accuracy_score,avg_latency_ms,avg_confidence FROM model_accuracy_registry ORDER BY accuracy_score DESC LIMIT 10`);
       try {
         await pool.query(`INSERT INTO agent_execution_logs (agent_name,action,input,output,confidence,status) VALUES ($1,'benchmark',$2,$3,$4,'completed')`,
-          [this.name, JSON.stringify({domains:Object.keys(BENCHMARK_QUESTIONS).length, models:FREE_MODELS.length}),
+          [this.name, JSON.stringify({domains:Object.keys(BENCHMARK_QUESTIONS).length, models:availableModels.length}),
            JSON.stringify({totalTests,totalSuccess,top_results:verify.rows}), Math.round((totalSuccess/totalTests)*100)]);
       } catch(e) { console.warn(`⚠️ log_fail: ${e.message}`); }
 
