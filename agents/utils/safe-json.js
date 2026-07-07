@@ -1,4 +1,4 @@
-import Groq from 'groq-sdk';
+import { multiModel } from '../governance/multi-model.js';
 import { pool } from './db.js';
 import crypto from 'crypto';
 import { semanticFirewall } from './semantic-firewall.js';
@@ -6,7 +6,6 @@ import { distill } from './knowledge-distiller.js';
 import { generateAgentToken, verifyAgentToken, fastPath, backgroundValidate } from './gateway-sentinel.js';
 import { logExecution } from './executor.js';
 
-var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 var MODEL_MATRIX = {
   financial:  { model: 'llama-3.3-70b-versatile', temp: 0.2, heavy: 'llama-3.3-70b-versatile', light: 'llama-3.1-8b-instant' },
@@ -85,15 +84,9 @@ async function getBestModel(taskType) {
 // ========== ESCALATION ENGINE (البند 7) ==========
 
 async function callSingleModel(prompt, modelKey, temp) {
-  var res = await groq.chat.completions.create({
-    model: modelKey,
-    messages: [
-      { role: 'system', content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.' },
-      { role: 'user', content: prompt }
-    ],
-    temperature: temp,
-    max_tokens: 1000,
-  });
+  var res = await multiModel.runByModelName(modelKey, prompt, 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.');
+  if (!res || !res.approved) throw new Error('Inference failed for ' + modelKey);
+  var raw = res.content || '';
   var raw = res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content ? res.choices[0].message.content : '';
   var clean = raw.replace(/```json|```/g, '').trim();
   var parsed;
@@ -413,15 +406,9 @@ export async function safeGroqJSON(prompt, model, agentName) {
   for (var ci = 0; ci < chain.length; ci++) {
     var m = chain[ci];
     try {
-      var res = await groq.chat.completions.create({
-        model: m,
-        messages: [
-          { role: 'system', content: 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: temp,
-        max_tokens: 1000,
-      });
+      var res = await multiModel.runByModelName(m, prompt, 'You are a JSON-only AI. Respond ONLY with valid JSON. No markdown, no explanation, no preamble.');
+      if (!res || !res.approved) throw new Error('Inference failed for ' + m);
+      var raw = res.content || '';
 
       var raw = res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content ? res.choices[0].message.content : '';
       var clean = raw.replace(/```json|```/g, '').trim();

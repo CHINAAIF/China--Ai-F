@@ -201,6 +201,19 @@ class InferenceGateway {
     });
     return models;
   }
+
+  /**
+   * توجيه طلب إلى نموذج محدد بالاسم عبر أي مزود يدعمه (يُستخدم لمحرك التصعيد)
+   */
+  async runByModelName(modelName, prompt, systemPrompt = '') {
+    for (const p of this.providers) {
+      if (p.client && p.models.includes(modelName) && p.isAvailable()) {
+        return this.runSpecificModel(p.name, modelName, prompt, systemPrompt);
+      }
+    }
+    // إذا لم يجد النموذج في المزودين، يستخدم أفضل مزود متاح
+    return this.runSingle('fallback', prompt, systemPrompt);
+  }
 }
 
 // Export as singleton to maintain state across the application
