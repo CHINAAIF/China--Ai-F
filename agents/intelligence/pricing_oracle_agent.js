@@ -1,21 +1,18 @@
-import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; 
+import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
 const pool = getPool('intelligence');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class PricingOracleAgent {
-  constructor() {
-    this.name = 'pricing_oracle_agent';
+  constructor() {                                                                                                                       this.name = 'pricing_oracle_agent';
     this.layer = 'intelligence';
     this.status = 'active';
   }
 
   async initialize() {
     try { await pool.query('SELECT 1'); return true; }
-    catch(e) { this.status = 'db_error'; return false; }
-  }
+    catch(e) { this.status = 'db_error'; return false; }                                                                              }
 
   async run(input = {}) {
     try {
@@ -25,22 +22,20 @@ class PricingOracleAgent {
         FROM models m
         JOIN vendors v ON m.vendor_id = v.id
         LEFT JOIN model_pricing_tiers mpt ON mpt.model_id = m.id AND mpt.active = true
-        WHERE m.status = 'active'
-        ORDER BY v.slug, m.slug
+        WHERE m.status = 'active'                                                                                                           ORDER BY v.slug, m.slug
         LIMIT 30
       `);
 
       const prompt = `أنت محلل أسعار نماذج الذكاء الاصطناعي.
 البيانات الحالية في قاعدة البيانات:
-${models.rows.map(r => r.slug + ' | ' + r.vendor + ' | ' + (r.price || 'N/A') + ' ' + (r.unit || '')).join('\n')}
+ ${models.rows.map(r => r.slug + ' | ' + r.vendor + ' | ' + (r.price || 'N/A') + ' ' + (r.unit || '')).join('\n')}
 
 مهمتك: تحديد أي تغييرات تسعير حديثة أو تناقضات في الأسعار.
 أجب بـJSON فقط بدون أي نص خارجه:
 {
   "signals": [
     {
-      "vendor": "openai",
-      "model_slug": "gpt-4o",
+      "vendor": "openai",                                                                                                                 "model_slug": "gpt-4o",
       "signal_type": "pricing_update",
       "title": "عنوان التغيير",
       "content": "وصف تفصيلي للتغيير",
@@ -52,19 +47,14 @@ ${models.rows.map(r => r.slug + ' | ' + r.vendor + ' | ' + (r.price || 'N/A') + 
   "confidence": 80
 }`;
 
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1500,
-      });
+      // استخدام البوابة الموحدة والتحقق التلقائي
+      const inferenceResult = await safeGroqJSON(prompt, 'You are an AI pricing analyst.', this.name);
 
-      let result;
-      try {
-        const text = completion.choices[0].message.content;
-        const clean = text.replace(/```json|```/g, '').trim();
-        result = JSON.parse(clean);
-      } catch(e) { throw new Error('JSON parse failed: ' + e.message); }
+      if (inferenceResult.error || !inferenceResult.data) {
+        throw new Error(inferenceResult.error || 'Inference failed or no data returned');
+      }
+
+      const result = inferenceResult.data;
 
       let inserted = 0;
       for (const signal of (result.signals || [])) {
@@ -102,4 +92,3 @@ ${models.rows.map(r => r.slug + ' | ' + r.vendor + ' | ' + (r.price || 'N/A') + 
 }
 
 export const pricingOracleAgent = new PricingOracleAgent();
-export default pricingOracleAgent;
