@@ -30,3 +30,11 @@ coverage/
 *~
 .vscode/
 .idea/
+
+# Database backups — MUST NEVER be committed (contain rotated secrets)
+db-backups/
+*.backup
+*.dump
+*.sql.gz
+backups/
+backup/

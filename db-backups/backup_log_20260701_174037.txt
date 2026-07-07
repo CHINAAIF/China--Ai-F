@@ -1,4 +1,0 @@
-🛡️ TRUNKIA - DATABASE SAFETY PROTOCOL
-========================================
-
-❌ FATAL: DATABASE_URL غير موجود. لا يمكن المتابعة.
