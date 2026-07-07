@@ -51,14 +51,43 @@ jobs:
           fetch-depth: 0           # CRITICAL: Gitleaks needs full git history
           persist-credentials: false
 
+      # -------------------------------------------------------------------------
+      # Gitleaks via CLI (not the Docker action — that hides the SARIF file
+      # inside the container filesystem where subsequent steps can't read it).
+      # -------------------------------------------------------------------------
+      - name: Install Gitleaks CLI
+        run: |
+          GITLEAKS_VERSION="8.21.2"
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          sudo tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
       - name: Gitleaks — Secret Detection (full history scan)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: true
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+        id: gitleaks
+        continue-on-error: true    # we want SARIF upload to happen even if leaks found
+        run: |
+          gitleaks detect \
+            --source . \
+            --report-format sarif \
+            --report-path gitleaks-results.sarif \
+            --no-banner \
+            --redact
+          # gitleaks exit codes: 0 = no leaks, 1 = leaks found, 2 = error
+          # We capture the exit code via continue-on-error + steps.gitleaks.outcome
+
+      - name: Verify Gitleaks SARIF was generated
+        if: always()
+        run: |
+          if [ -f gitleaks-results.sarif ]; then
+            echo "✓ gitleaks-results.sarif exists ($(wc -c < gitleaks-results.sarif) bytes)"
+          else
+            echo "::error::gitleaks-results.sarif was not generated"
+            exit 1
+          fi
 
       - name: Semgrep — SAST (JS/Node + OWASP Top 10 + misconfig)
+        id: semgrep
         uses: returntocorp/semgrep-action@v1
         with:
           config: >-
@@ -67,21 +96,38 @@ jobs:
             p/owasp-top-ten
             p/r2c-bug-scan
             p/react-best-practices
-          generate-sarif: true
+          args: --sarif --output=semgrep.sarif
+
+      - name: Verify Semgrep SARIF was generated
+        if: always()
+        run: |
+          if [ -f semgrep.sarif ]; then
+            echo "✓ semgrep.sarif exists ($(wc -c < semgrep.sarif) bytes)"
+          else
+            echo "::error::semgrep.sarif was not generated"
+            exit 1
+          fi
 
       - name: Upload Semgrep SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
           category: semgrep
 
       - name: Upload Gitleaks SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitleaks-results.sarif
           category: gitleaks
+
+      # Final gate: fail the job if gitleaks found leaks (after SARIF upload)
+      - name: Fail job if Gitleaks found leaks
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          echo "::error::Gitleaks found secrets in the repository — see Security tab for details"
+          exit 1
 
   # ===========================================================================
   # JOB 2: Tests + Dependency Audit
