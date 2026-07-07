@@ -1,9 +1,8 @@
-import { logExecution, safeStep } from '../utils/executor.js';
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
-import Groq from 'groq-sdk';
+import dotenv from 'dotenv'; 
+import { getPool } from '../../lib/db.js';
+import { safeGroqJSON } from '../utils/safe-json.js';
 
 const pool = getPool('intelligence');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 class BenchmarkRunnerAgent {
   constructor() {
@@ -47,10 +46,10 @@ class BenchmarkRunnerAgent {
       const prompt = `أنت محلل معايير أداء نماذج الذكاء الاصطناعي.
 
 المعايير المتاحة (${benchmarks.rows.length} معيار):
-${benchmarks.rows.map(b => b.slug + ' | ' + b.category + ' | نماذج: ' + b.model_count + ' | متوسط: ' + (parseFloat(b.avg_score)||0).toFixed(1)).join('\n')}
+ ${benchmarks.rows.map(b => b.slug + ' | ' + b.category + ' | نماذج: ' + b.model_count + ' | متوسط: ' + (parseFloat(b.avg_score)||0).toFixed(1)).join('\n')}
 
 أفضل النماذج حالياً:
-${topModels.rows.map(m => m.slug + ' | ' + m.vendor + ' | متوسط percentile: ' + (parseFloat(m.avg_percentile)||0).toFixed(1)).join('\n')}
+ ${topModels.rows.map(m => m.slug + ' | ' + m.vendor + ' | متوسط percentile: ' + (parseFloat(m.avg_percentile)||0).toFixed(1)).join('\n')}
 
 مهمتك: تحليل نتائج المعايير وتحديد:
 1. أي نماذج تحتاج تحديث نتائجها
@@ -74,19 +73,14 @@ ${topModels.rows.map(m => m.slug + ' | ' + m.vendor + ' | متوسط percentile:
   "confidence": 75
 }`;
 
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1500,
-      });
+      // استخدام البوابة الموحدة والتحقق التلقائي
+      const inferenceResult = await safeGroqJSON(prompt, null, this.name);
 
-      let result;
-      try {
-        const text = completion.choices[0].message.content;
-        const clean = text.replace(/```json|```/g, '').trim();
-        result = JSON.parse(clean);
-      } catch(e) { throw new Error('JSON parse failed: ' + e.message); }
+      if (inferenceResult.error || !inferenceResult.data) {
+        throw new Error(inferenceResult.error || 'Inference failed or no data returned');
+      }
+
+      const result = inferenceResult.data;
 
       let inserted = 0;
       for (const signal of (result.signals || [])) {
@@ -124,4 +118,3 @@ ${topModels.rows.map(m => m.slug + ' | ' + m.vendor + ' | متوسط percentile:
 }
 
 export const benchmarkRunnerAgent = new BenchmarkRunnerAgent();
-export default benchmarkRunnerAgent;
