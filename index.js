@@ -1,4 +1,5 @@
 import './config/env.js';
+import { addInferenceJob, getJobStatus } from './lib/job-queue.js';
 import * as Sentry from '@sentry/node';
 
 if (process.env.SENTRY_DSN) {
@@ -456,6 +457,30 @@ app.post('/api/intelligence/arxiv-scan', async (req, res) => {
 /* ===== OBSERVABILITY: Sentry Error Handler ===== */
 // يجب أن يكون قبل أي مسار 404 أو معالج أخطاء آخر
 app.use(Sentry.Handlers.errorHandler());
+
+
+/* ===== ASYNC INFERENCE QUEUE (Enterprise Distributed) ===== */
+app.post('/api/inference/queue', async (req, res) => {
+  try {
+    if (!process.env.REDIS_URL) {
+      return res.status(503).json({ error: 'Queue service unavailable (Redis not configured)' });
+    }
+    const jobId = await addInferenceJob(req.body);
+    res.status(202).json({ job_id: jobId, status: 'pending', message: 'Inference scheduled. Poll /api/inference/status/:id to get the result.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to enqueue inference job', details: e.message });
+  }
+});
+
+app.get('/api/inference/status/:id', async (req, res) => {
+  try {
+    const job = await getJobStatus(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json(job);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 /* ===== 404 HANDLER ===== */
 app.use(function(req, res) {
