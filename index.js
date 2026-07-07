@@ -59,20 +59,48 @@ app.use(helmet({
 }));
 
 /* ===== SECURITY: CORS ===== */
+/* ===== SECURITY: Strict CORS Policy (Enterprise Grade) ===== */
 app.use(cors({
   origin: function(origin, callback) {
-    var allowed = (process.env.CORS_ORIGINS || '*').split(',').map(function(s) { return s.trim(); });
-    if (allowed.indexOf('*') !== -1 || !origin || allowed.indexOf(origin) !== -1) { callback(null, true); }
-    else { callback(new Error('CORS blocked')); }
+    var env = process.env.NODE_ENV || 'development';
+    var allowed = (process.env.CORS_ORIGINS || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    
+    // 1. في بيئة التطوير فقط، نسمح بكل شيء لتسهيل العمل
+    if (env === 'development' && (allowed.indexOf('*') !== -1 || !origin)) {
+      return callback(null, true);
+    }
+    
+    // 2. في الإنتاج أو أي بيئة أخرى، يجب أن يكون الأصل (Origin) موجوداً ومصرحاً به صراحة
+    if (allowed.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // 3. رفض أي طلب لا يطابق القائمة البيضاء الصارمة
+    return callback(new Error('CORS blocked: Strict Origin Policy'));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  credentials: true, // ضروري إذا كنا سنستخدم كوكيز آمنة لاحقاً
   maxAge: 86400
 }));
 
 /* ===== SECURITY: Rate Limiting ===== */
 var globalLimiter = rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Rate limit exceeded', retry_after: 60 } });
 app.use('/api/', globalLimiter);
+
+/* ===== RESILIENCE: Adaptive Load Shedding (Enterprise Grade) ===== */
+// يحمي النظام من الانهيار تحت الضغط: إذا كانت قاعدة البيانات متعطلة أو النظام ينهار، نرفض الطلبات فوراً.
+app.use('/api/', (req, res, next) => {
+  // 1. إذا كان قاطع الدائرة مفتوحاً (القاعدة بيانات ميتة)، نرفض الطلبات فوراً
+  if (circuit.state === 'OPEN') {
+    return res.status(503).json({ error: 'Service Unavailable: Circuit Breaker Open', retry_after: 30 });
+  }
+  // 2. إذا كانت درجة الصحة منخفضة جداً، نحمي النظام من الانهيار
+  if (cachedHealth && cachedHealth.score < 40 && req.path !== '/api/system/pulse') {
+    return res.status(503).json({ error: 'Service Degraded: Load Shedding Active', retry_after: 15 });
+  }
+  next();
+});
 
 var strictLimiter = rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Strict rate limit exceeded', retry_after: 60 } });
 app.use('/api/self-heal/', strictLimiter);
