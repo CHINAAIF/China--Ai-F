@@ -5,12 +5,23 @@ services:
     build: .
     container_name: trunkia-app
     restart: unless-stopped
-    # Zero Ports: لا نقوم بتعريض أي بورت للإنترنت. 
-    # التطبيق يسمح بالوصول فقط من داخل شبكة Docker.
     expose:
       - "8080"
     env_file:
       - .env.production
+    depends_on:
+      - redis
+    networks:
+      - trunkia-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: trunkia-redis
+    restart: unless-stopped
+    # تمكين.Persistence لضمان عدم فقدان المهام عند إعادة التشغيل
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
     networks:
       - trunkia-net
 
@@ -18,7 +29,6 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: trunkia-tunnel
     restart: unless-stopped
-    # تشغيل النفق باستخدام التوكن الذي سنوفره
     command: tunnel run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
@@ -30,3 +40,6 @@ services:
 networks:
   trunkia-net:
     driver: bridge
+
+volumes:
+  redis-data:
