@@ -6,7 +6,7 @@
 TRUNKIA is an independent AI model intelligence platform.
 We help you discover, compare, and master AI models from around the world.
 
-### What We Offer
+### What We Offer Combine open-source models into a single environment; you can use multiple models simultaneously; distribute tasks according to the model best suited for the task. Our environment is a protection unit for everything sensitive that could harm the user, whether it's a company, organization, or developer. It provides comprehensive protection and prevents the leakage of information and secrets. We offer cost reduction and high-quality accuracy in results and answers. 
 - **Model Comparison**: Side-by-side comparison of global AI models
 - **Pricing Intelligence**: Real-time pricing and cost analysis
 - **Performance Benchmarks**: Objective performance data
