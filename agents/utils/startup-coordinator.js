@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 // ── بصمة فريدة لكل instance ──────────────────────────────────────
 const INSTANCE_ID = crypto.randomBytes(8).toString('hex');
-const STARTUP_KEY = `startup_lock:${process.env.RAILWAY_SERVICE_ID;
+const STARTUP_KEY = `startup_lock:${process.env.RAILWAY_SERVICE_ID}`;
 
 // ── جدول الـPipelines بأولوياتها وتأخيراتها ─────────────────────
 const PIPELINE_SCHEDULE = [
