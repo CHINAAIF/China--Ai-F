@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
-import { tableExists } from '../utils/executor.js';
+import { tableExists } from '../../lib/services/executor.js';
 
 const pool = getPool('governance');
 const MASTER_KEY = process.env.ENCRYPTION_KEY;

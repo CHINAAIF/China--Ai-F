@@ -2,7 +2,7 @@ import { getPool } from '../../lib/db.js';
 import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { brain } from '../brain.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 const pool = getPool('intelligence');
 

@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { pool } from '../utils/db.js';
-import { distill } from '../utils/knowledge-distiller.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { pool } from '../../lib/services/db.js';
+import { distill } from '../../lib/services/knowledge-distiller.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 class KnowledgeDistillationAgent {
   constructor() {

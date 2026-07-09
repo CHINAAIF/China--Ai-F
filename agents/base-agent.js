@@ -3,7 +3,7 @@
  * أي وكيل جديد يجب أن يرث من هذا الكلاس لضمان التوافق التام مع الذاكرة المشتركة والبوابة.
  */
 import { writeMemory, readMemory } from '../lib/blackboard.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { safeGroqJSON } from '../lib/services/safe-json.js';
 
 export class BaseAgent {
   constructor(name, layer) {

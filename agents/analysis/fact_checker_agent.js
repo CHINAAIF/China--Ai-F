@@ -2,9 +2,9 @@
  * fact_checker_agent | layer: analysis
  * منطق Groq حقيقي — يستخدم safe-json.js
  */
-import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import dotenv from 'dotenv'; import { pool } from '../../lib/services/db.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 class FactCheckerAgent {
   constructor() {

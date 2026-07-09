@@ -1,4 +1,4 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 /**
  * policy-enforcer | layer: governance
  * FIX FINAL: hash يُحسب على content::text بعد INSERT — يطابق pg دائماً

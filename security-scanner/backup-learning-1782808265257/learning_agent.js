@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'; dotenv.config();
-import { pool } from '../utils/db.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { pool } from '../../lib/services/db.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 class LearningAgent {
   constructor() { this.name = 'learning_agent'; this.layer = 'learning'; this.status = 'active'; }

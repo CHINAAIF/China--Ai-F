@@ -1,4 +1,4 @@
-import { pool } from './utils/db.js';
+import { pool } from '../lib/services/db.js';
 export class TRUNKIABrain {
     constructor() {
         this.pool = pool;

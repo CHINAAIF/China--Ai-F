@@ -1,6 +1,6 @@
 import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
-import { tableExists } from '../utils/executor.js';
+import { tableExists } from '../../lib/services/executor.js';
 
 // ── التحقق الصارم من البيئة ────────────────────────────────────
 if (!process.env.DATABASE_URL) {

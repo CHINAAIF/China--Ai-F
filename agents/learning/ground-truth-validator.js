@@ -1,7 +1,7 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 import dotenv from 'dotenv'; 
 import { getPool } from '../../lib/db.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
 const pool = getPool('learning');
 

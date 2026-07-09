@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; import { pool } from './db-governance.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 class Agent {
   constructor() { this.name = 'quality_auditor'; this.layer = 'governance'; this.status = 'active'; }

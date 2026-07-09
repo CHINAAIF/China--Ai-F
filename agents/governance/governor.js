@@ -1,5 +1,5 @@
 import { pool } from './db-governance.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 export class GovernanceLayer {
 
   // تحكيم متعدد النماذج

@@ -1,7 +1,7 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 import { config } from 'dotenv'; config();
-import { pool } from '../utils/db.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { pool } from '../../lib/services/db.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
 import { createHash } from 'crypto';
 
 function entityHash(name, type) {

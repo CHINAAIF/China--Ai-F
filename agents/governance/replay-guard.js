@@ -1,4 +1,4 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 /**
  * replay-guard | layer: governance
  * العقلية 19: كل nonce مستخدم يُسجَّل ويُرفض إعادة استخدامه

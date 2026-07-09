@@ -4,7 +4,7 @@
  * يرفع الحجر المنتهي → يُقيّم confidence → ينقل المؤهل → يُسجّل gaps
  */
 import dotenv from 'dotenv'; import pg from 'pg';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
 import { pool } from './db-learning.js';
 

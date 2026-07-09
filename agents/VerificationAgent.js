@@ -1,6 +1,6 @@
 // Agent 2: VerificationAgent - Autonomous Production Engine
 import process from 'process';
-import { logExecution, safeStep, tableExists } from '../../utils/executor.js';
+import { logExecution, safeStep, tableExists } from '../lib/services/executor.js';
 
 export class VerificationAgent {
     constructor() {

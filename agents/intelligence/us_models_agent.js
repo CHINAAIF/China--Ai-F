@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; 
 import { getPool } from '../../lib/db.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
 const pool = getPool('intelligence');
 

@@ -1,7 +1,7 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 import { pool } from '../../lib/db.js';
 import { multiModel } from '../governance/multi-model.js';
-import { pingHeartbeat } from '../utils/heartbeat.js';
+import { pingHeartbeat } from '../../lib/services/heartbeat.js';
 
 const BENCHMARK_QUESTIONS = {
   'chinese_ai_models': 'ما هي أبرز نماذج الذكاء الاصطناعي الصينية في 2025 ومزاياها التقنية؟ أجب بـ JSON: {models:array,key_differentiators:string,confidence:number}',

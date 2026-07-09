@@ -5,7 +5,7 @@
  */
 import dotenv from 'dotenv'; dotenv.config();
 import pg from 'pg';
-import { safeGroqJSON } from '../utils/safe-json.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl:{rejectUnauthorized: true} });
 

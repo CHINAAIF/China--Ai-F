@@ -3,8 +3,8 @@
  * منطق Groq حقيقي — يستخدم safe-json.js
  */
 import dotenv from 'dotenv'; import { pool } from './db-security.js';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 class IpProtectionAgent {
   constructor() {

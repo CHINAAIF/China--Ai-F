@@ -1,4 +1,6 @@
 import './config/env.js';
+import { adminGuard } from './lib/admin-guard.js';
+
 import { addInferenceJob, getJobStatus } from './lib/job-queue.js';
 import * as Sentry from '@sentry/node';
 
@@ -43,7 +45,7 @@ var app = express();
 app.set('trust proxy', 1);
 
 /* ===== OBSERVABILITY: Sentry Request Handler ===== */
-app.use(Sentry.Handlers.requestHandler());
+if (process.env.SENTRY_DSN && Sentry.Handlers) { app.use(Sentry.Handlers.requestHandler()); }
 
 /* ===== SECURITY: Cloudflare Real IP Extraction (Zero-Trust) ===== */
 // يستخرج IP الحقيقي للمستخدم من Cloudflare لضمان عمل Rate Limiting وتتبع المهاجمين بدقة
@@ -458,7 +460,7 @@ app.post('/api/intelligence/arxiv-scan', async (req, res) => {
 
 /* ===== OBSERVABILITY: Sentry Error Handler ===== */
 // يجب أن يكون قبل أي مسار 404 أو معالج أخطاء آخر
-app.use(Sentry.Handlers.errorHandler());
+if (process.env.SENTRY_DSN && Sentry.Handlers) { app.use(Sentry.Handlers.errorHandler()); }
 
 
 /* ===== ASYNC INFERENCE QUEUE (Enterprise Distributed) ===== */

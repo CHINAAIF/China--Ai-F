@@ -1,8 +1,8 @@
-import { logExecution, safeStep } from '../utils/executor.js';
+import { logExecution, safeStep } from '../../lib/services/executor.js';
 import dotenv from 'dotenv'; import { pool } from './db-intelligence.js';
 import crypto from 'crypto';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { pingHeartbeat } from '../utils/heartbeat.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { pingHeartbeat } from '../../lib/services/heartbeat.js';
 
 class BrainAcquisitionAgent {
   constructor() {

@@ -1,7 +1,7 @@
-import dotenv from 'dotenv'; import { pool } from '../utils/db.js';
+import dotenv from 'dotenv'; import { pool } from '../../lib/services/db.js';
 import { createHmac } from 'crypto';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 const HMAC_SECRET = process.env.ENCRYPTION_KEY;
 

@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 config();
-import { pool } from './utils/db.js';
+import { pool } from '../lib/services/db.js';
 
 // ── جدول الأولويات — مسارات مؤكَّدة الوجود فعلياً ──────────────
 const SCHEDULE = [

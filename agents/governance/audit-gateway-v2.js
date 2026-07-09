@@ -1,7 +1,7 @@
 import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
-import { safeGroqJSON } from '../utils/safe-json.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 const pool = getPool('governance');
 

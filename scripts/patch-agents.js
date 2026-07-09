@@ -42,7 +42,7 @@ async function patchFile(fullPath) {
 
     // ── إضافة logExecution import إن غاب ───────────────────
     if (!src.includes('executor') && !src.includes('logExecution')) {
-      const importLine = `import { logExecution, safeStep, tableExists } from '../utils/executor.js';\n`;
+      const importLine = `import { logExecution, safeStep, tableExists } from '../lib/services/executor.js';\n`;
       // حساب المسار النسبي الصحيح
       const depth = rel.split('/').length - 1;
       const prefix = depth === 1 ? '../' : '../../';

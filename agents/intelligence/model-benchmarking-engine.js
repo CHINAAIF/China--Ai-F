@@ -1,7 +1,7 @@
 import { getPool } from '../../lib/db.js';
 import crypto from 'crypto';
 import { multiModel } from '../governance/multi-model.js';
-import { logExecution, safeStep, tableExists } from '../utils/executor.js';
+import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
 var pool = getPool('intelligence');
 
