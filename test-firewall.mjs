@@ -1,4 +1,4 @@
-import { semanticFirewall } from './agents/utils/safe-json.js';
+import { semanticFirewall } from './lib/services/safe-json.js';
 
 const attacks = [
   ['DROP TABLE users',              'sql_injection'],

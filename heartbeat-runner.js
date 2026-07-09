@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'; dotenv.config();
 import { loadAllAgents } from './agents/registry.js';
-import { pingHeartbeat, markMissed, getSystemHealth } from './agents/utils/heartbeat.js';
+import { pingHeartbeat, markMissed, getSystemHealth } from './lib/services/heartbeat.js';
 
 const INTERVAL_MS = 60 * 1000; // كل دقيقة
 

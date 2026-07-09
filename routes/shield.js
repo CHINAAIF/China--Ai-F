@@ -3,8 +3,8 @@ dotenv.config();
 import { Router } from 'express';
 import crypto from 'crypto';
 import { safetyComplianceLayer } from '../agents/governance/safety-compliance-layer.js';
-import { safeGroqJSON } from '../agents/utils/safe-json.js';
-import { tableExists } from '../agents/utils/executor.js';
+import { safeGroqJSON } from '../lib/services/safe-json.js';
+import { tableExists } from '../lib/services/executor.js';
 import pg from 'pg';
 
 var router = Router();

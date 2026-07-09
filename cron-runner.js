@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import pg from 'pg';
-import { checkAndAlert } from './agents/utils/alert-engine.js';
+import { checkAndAlert } from './lib/services/alert-engine.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -43,11 +43,11 @@ const PIPELINES = [
     name: 'service-pipeline',
     interval_ms: 2 * 60 * 60000,
     agents: [
-      './agents/service/platform_health_agent.js',
-      './agents/service/api_monitor_agent.js',
-      './agents/service/db_guardian_agent.js',
-      './agents/service/performance_agent.js',
-      './agents/service/error_recovery_agent.js',
+      './lib/services/platform_health_agent.js',
+      './lib/services/api_monitor_agent.js',
+      './lib/services/db_guardian_agent.js',
+      './lib/services/performance_agent.js',
+      './lib/services/error_recovery_agent.js',
     ]
   },
   {
@@ -135,7 +135,7 @@ async function start() {
 start();
 
 // ── Startup Coordinator Integration ─────────────────────────────
-import { coordinateStartup } from './agents/utils/startup-coordinator.js';
+import { coordinateStartup } from './lib/services/startup-coordinator.js';
 
 async function pipelineRunner(pipelineName) {
   const pipeline = PIPELINES.find(p => p.name === pipelineName);
