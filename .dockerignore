@@ -1,0 +1,17 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+npm-debug.log
+
+# Env files (يجب ألا تدخل الحاوية أبداً)
+.env
+.env.*
+!.env.production
+
+# مجلدات ميتة يجب ألا تُبنى أبداً في الإنتاج
+agents/utils
+agents/service
+security-scanner
