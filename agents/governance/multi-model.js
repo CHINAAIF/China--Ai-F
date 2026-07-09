@@ -1,26 +1,46 @@
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { semanticCache } from '../../lib/semantic-cache.js';
 
-/**
- * TRUNKIA Enterprise Inference Gateway
- * Implements Circuit Breakers, Latency Tracking, and Smart Failover.
- */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class ProviderState {
-  constructor(name, client, models, priority) {
-    this.name = name;
-    this.client = client;
-    this.models = models;
-    this.priority = priority; // 1 = highest
+  constructor(config) {
+    this.name = config.name;
+    this.baseURL = config.baseURL;
+    this.apiKey = process.env[config.envKey];
+    this.priority = config.priority;
+    this.models = config.models;
+    this.client = null;
     this.failures = 0;
     this.lastFailure = 0;
-    this.latency = 1000; // EMA Latency in ms
+    this.latency = 1000;
     this.circuitOpen = false;
+
+    if (this.apiKey) {
+      this.client = new OpenAI({ baseURL: this.baseURL, apiKey: this.apiKey });
+    }
+  }
+
+  isAvailable() {
+    if (!this.client) return false;
+    if (this.circuitOpen) {
+      if (Date.now() - this.lastFailure > 30000) {
+        this.circuitOpen = false;
+        this.failures = 0;
+        return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   recordSuccess(latency) {
     this.failures = 0;
     this.circuitOpen = false;
-    // Exponential Moving Average for latency (alpha = 0.3)
     this.latency = (this.latency * 0.7) + (latency * 0.3);
   }
 
@@ -32,190 +52,100 @@ class ProviderState {
       console.warn(`[InferenceGateway] Circuit OPENED for provider ${this.name}`);
     }
   }
-
-  isAvailable() {
-    if (this.circuitOpen) {
-      // Half-Open state: try again after 30 seconds
-      if (Date.now() - this.lastFailure > 30000) {
-        this.circuitOpen = false;
-        this.failures = 0;
-        console.log(`[InferenceGateway] Circuit HALF-OPEN for provider ${this.name}. Retrying...`);
-        return true;
-      }
-      return false;
-    }
-    return true;
-  }
 }
 
 class InferenceGateway {
   constructor() {
     this.providers = [];
-    this.initProviders();
+    this.loadProviders();
   }
 
-  initProviders() {
-    // Initialize Groq
-    if (process.env.GROQ_API_KEY) {
-      this.providers.push(
-        new ProviderState(
-          'groq',
-          new Groq({ apiKey: process.env.GROQ_API_KEY }),
-          ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
-          1
-        )
-      );
+  loadProviders() {
+    try {
+      const configPath = path.resolve(__dirname, '../../config/inference-providers.json');
+      const configData = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configData);
+      this.providers = config.providers.map(p => new ProviderState(p));
+      const activeCount = this.providers.filter(p => p.client).length;
+      console.log(`[InferenceGateway] Initialized ${activeCount} active providers out of ${this.providers.length} configured.`);
+    } catch (err) {
+      console.error('[InferenceGateway] FATAL: Could not load providers config:', err.message);
     }
-    // Future providers can be pushed here (Gemini, DeepSeek, etc.)
-    // We keep the structure ready for dynamic scaling.
   }
 
   getBestProviders(taskType) {
-    // 1. Filter by availability (Circuit Breaker check)
     let available = this.providers.filter(p => p.isAvailable());
-    
-    if (available.length === 0) {
-      console.error('[InferenceGateway] FATAL: All providers circuits are OPEN!');
-      return [];
-    }
-
-    // 2. Sort by Priority first, then by Latency (fastest first)
+    if (available.length === 0) return [];
     available.sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
       return a.latency - b.latency;
     });
-
     return available;
   }
 
-  async runSingle(taskType, prompt, systemPrompt = '') {
+  async runSingle(taskType, prompt, systemPrompt = '', userId = 'global') {
+    // 1. فحص الـ Semantic Cache أولاً (Zero-Cost Path)
+    const cached = semanticCache.search(prompt, userId);
+    if (cached) {
+      return cached;
+    }
+
+    // 2. إذا لم يكن موجوداً، نستدعي المزود
     const candidates = this.getBestProviders(taskType);
-    
+    if (candidates.length === 0) {
+      return { approved: false, error: 'No active providers available.' };
+    }
+
     for (const provider of candidates) {
       const startTime = Date.now();
       try {
-        let result;
-        if (provider.name === 'groq') {
-          result = await this._executeGroq(provider, prompt, systemPrompt);
-        }
-        // Add other providers execution here
+        const model = provider.models[0];
+        const res = await provider.client.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 1024,
+          temperature: 0.3
+        });
 
         const latency = Date.now() - startTime;
         provider.recordSuccess(latency);
-        
-        return {
+
+        const result = {
           approved: true,
-          content: result.content,
-          model: `${provider.name}/${result.model}`,
-          tokens: result.tokens,
+          content: res.choices?.[0]?.message?.content,
+          model: `${provider.name}/${model}`,
+          tokens: res.usage?.total_tokens,
           latency_ms: latency
         };
 
+        // 3. تخزين النتيجة الناجحة في الـ Cache لطلب يستفيد منها مستقبلاً
+        semanticCache.store(prompt, result, userId, result.tokens);
+
+        return result;
+
       } catch (err) {
-        const latency = Date.now() - startTime;
         provider.recordFailure();
-        console.error(`[InferenceGateway] Provider ${provider.name} failed in ${latency}ms: ${err.message}`);
-        // Continue to next provider (Failover)
+        console.error(`[InferenceGateway] Provider ${provider.name} failed: ${err.message}`);
       }
     }
 
-    // If we reach here, all providers failed
-    return { approved: false, error: 'All inference providers failed or circuits are open.' };
-  }
-
-  async _executeGroq(provider, prompt, systemPrompt) {
-    const model = provider.models[0]; // Default to first model
-    const res = await provider.client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 1024,
-      temperature: 0.3
-    });
-
-    return {
-      content: res.choices[0].message.content,
-      model: model,
-      tokens: res.usage?.total_tokens
-    };
+    return { approved: false, error: 'All available inference providers failed.' };
   }
 
   getHealthStatus() {
     return this.providers.map(p => ({
       name: p.name,
+      configured: !!p.client,
       available: p.isAvailable(),
       failures: p.failures,
       circuit_open: p.circuitOpen,
       avg_latency_ms: Math.round(p.latency)
     }));
   }
-
-  /**
-   * توجيه طلب إلى مزود ونموذج محدد بالاسم (يُستخدم لمحرك اختبار الأداء)
-   */
-  async runSpecificModel(providerName, modelName, prompt, systemPrompt = '') {
-    const provider = this.providers.find(p => p.name === providerName && p.client);
-    if (!provider || !provider.isAvailable()) {
-      throw new Error(`Provider ${providerName} not available or circuit open.`);
-    }
-
-    const startTime = Date.now();
-    try {
-      const res = await provider.client.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 1024,
-        temperature: 0.3
-      });
-
-      const latency = Date.now() - startTime;
-      provider.recordSuccess(latency);
-
-      return {
-        approved: true,
-        content: res.choices?.[0]?.message?.content,
-        model: `${providerName}/${modelName}`,
-        tokens: res.usage?.total_tokens,
-        latency_ms: latency
-      };
-    } catch (err) {
-      provider.recordFailure();
-      throw err;
-    }
-  }
-
-  /**
-   * يُرجع قائمة بكل المزودين والنماذج المُهيأة (للمحرك الاختبار)
-   */
-  getAllAvailableModels() {
-    let models = [];
-    this.providers.forEach(p => {
-      if (p.client) {
-        p.models.forEach(m => models.push({ provider: p.name, model: m }));
-      }
-    });
-    return models;
-  }
-
-  /**
-   * توجيه طلب إلى نموذج محدد بالاسم عبر أي مزود يدعمه (يُستخدم لمحرك التصعيد)
-   */
-  async runByModelName(modelName, prompt, systemPrompt = '') {
-    for (const p of this.providers) {
-      if (p.client && p.models.includes(modelName) && p.isAvailable()) {
-        return this.runSpecificModel(p.name, modelName, prompt, systemPrompt);
-      }
-    }
-    // إذا لم يجد النموذج في المزودين، يستخدم أفضل مزود متاح
-    return this.runSingle('fallback', prompt, systemPrompt);
-  }
 }
 
-// Export as singleton to maintain state across the application
 export const multiModel = new InferenceGateway();
 export default multiModel;

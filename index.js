@@ -25,6 +25,7 @@ import './lib/cognitive-optimizer.mjs';
 import { validateApiKeyAndQuota, generateNewApiKey } from './lib/iam-gateway.mjs';
 import { strategicIntelligenceAgent } from './agents/intelligence/strategic-intelligence-agent.js';
 import { multiModel } from './agents/governance/multi-model.js';
+import { semanticCache } from './lib/semantic-cache.js';
 import { arxivSentinelAgent } from './agents/intelligence/arxiv-sentinel-agent.js';
 import { handleSovereignInference } from './lib/sovereign-inference-router.mjs';
 import express from 'express';
@@ -489,6 +490,16 @@ app.get('/api/llm/health', (req, res) => {
   try {
     const health = multiModel.getHealthStatus();
     res.json({ providers: health, total_providers: health.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+/* ===== OBSERVABILITY: Semantic Cache & Cost Analytics ===== */
+app.get('/api/llm/cache-stats', (req, res) => {
+  try {
+    res.json(semanticCache.getStats());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
