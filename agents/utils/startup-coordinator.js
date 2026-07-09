@@ -50,7 +50,7 @@ async function registerInstance() {
         started_at = NOW(),
         last_heartbeat = NOW(),
         status = 'starting'
-    `, [INSTANCE_ID, process.env.RAILWAY_SERVICE_ID);
+    `, [INSTANCE_ID, process.env.RAILWAY_SERVICE_ID]);
 
     console.log(`🆔 Instance registered: ${INSTANCE_ID}`);
     return true;
