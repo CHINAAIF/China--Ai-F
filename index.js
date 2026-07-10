@@ -1,5 +1,7 @@
 import './config/env.js';
 import { adminGuard } from './lib/admin-guard.js';
+import { faultDetectorAgent } from './agents/system/fault-detector-agent.js';
+import { selfHealerAgent } from './agents/system/self-healer-agent.js';
 
 import { addInferenceJob, getJobStatus } from './lib/job-queue.js';
 import * as Sentry from '@sentry/node';

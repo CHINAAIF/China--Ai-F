@@ -1,6 +1,7 @@
 import { BaseAgent } from '../base-agent.js';
 import { monitorEventLoopDelay } from 'perf_hooks';
 import { getPool } from '../../lib/db.js';
+import { writeMemory } from '../../lib/blackboard.js';
 
 /**
  * TRUNKIA Fault Detector Agent
@@ -82,7 +83,7 @@ class FaultDetectorAgent extends BaseAgent {
 
     // 4. الحفظ في الذاكرة المشتركة ليراه وكيل الشفاء الذاتي
     if (vitals.stress_score > 0) {
-      await this.remember('system_vitals', vitals, 60); // Save for 1 minute
+      await writeMemory('system:vitals', vitals, 60); // Save to Global Channel
       console.warn(`[FaultDetector] Stress Score: ${vitals.stress_score}. Alerts: ${vitals.alerts.length}`);
     }
 
