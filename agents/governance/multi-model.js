@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { semanticCache } from '../../lib/semantic-cache.js';
+import { isSafePrompt, SAFE_BLOCK_RESPONSE } from '../../lib/input-guard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,6 +85,11 @@ class InferenceGateway {
   }
 
   async runSingle(taskType, prompt, systemPrompt = '', userId = 'global') {
+    // 0. جدار الحماية الدلالي: منع حقن الأوامر قبل أي معالجة
+    if (!isSafePrompt(prompt)) {
+      return SAFE_BLOCK_RESPONSE;
+    }
+
     // 1. فحص الـ Semantic Cache أولاً (Zero-Cost Path)
     const cached = semanticCache.search(prompt, userId);
     if (cached) {
