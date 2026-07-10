@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { semanticCache } from '../../lib/semantic-cache.js';
 import { isSafePrompt, SAFE_BLOCK_RESPONSE } from '../../lib/input-guard.js';
+import { dlpAgent } from '../system/dlp-agent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
