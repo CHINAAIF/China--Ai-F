@@ -58,11 +58,9 @@ app.use((req, res, next) => {
   const xff = req.headers['x-forwarded-for'];
   
   if (cfIp) {
-    req.realIp = cfIp;
-    req.ip = cfIp; // Override Express IP for rate limiters
+    req.realIp = cfIp; // fix: req.ip is a getter-only property in Express, cannot be overwritten
   } else if (xff) {
     req.realIp = xff.split(',')[0].trim();
-    req.ip = req.realIp;
   } else {
     req.realIp = req.socket.remoteAddress;
   }
