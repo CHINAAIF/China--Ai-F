@@ -524,7 +524,17 @@ function setupCron(cl) {
     cronJobs['agent-sync'] = cl.schedule('0 * * * *', async function() { try { var r = await syncAgentsToDb(); cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } });
     cronJobs['self-heal'] = cl.schedule('*/15 * * * *', async function() { try { var r = await selfHeal(); cronStats['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { cronStats['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } });
     cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', async function() { try { await runGovernanceMonitor(); cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } });
-    console.log('Cron: 4 jobs scheduled');
+    // Sensory Agents (تعمل كل ساعة)
+    cronJobs['arxiv-sentinel'] = cl.schedule('0 * * * *', async function() { try { await arxivSentinelAgent.run('Artificial Intelligence'); } catch (e) { console.error('[ARXIV SENTINEL ERR]', e.message); } });
+    cronJobs['china-news'] = cl.schedule('30 * * * *', async function() { try { await chinaNewsAgent.run(); } catch (e) { console.error('[CHINA NEWS ERR]', e.message); } });
+    
+    // System Swarm Agents (تعمل في الخلفية)
+    cronJobs['fault-detector'] = cl.schedule('* * * * *', async function() { try { await faultDetectorAgent.run(); } catch (e) { console.error('[FAULT DETECTOR ERR]', e.message); } });
+    cronJobs['self-healer'] = cl.schedule('* * * * *', async function() { try { await selfHealerAgent.run(); } catch (e) { console.error('[SELF HEALER ERR]', e.message); } });
+    cronJobs['red-team'] = cl.schedule('0 * * * *', async function() { try { await redTeamAgent.run(); } catch (e) { console.error('[RED TEAM ERR]', e.message); } });
+    cronJobs['dlp-stats'] = cl.schedule('0 */6 * * *', async function() { try { await dlpAgent.run(); } catch (e) { console.error('[DLP STATS ERR]', e.message); } });
+    
+    console.log('Cron: 10 jobs scheduled (Sensory + System Swarm active)');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
