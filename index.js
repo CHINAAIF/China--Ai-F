@@ -534,7 +534,8 @@ function setupCron(cl) {
     cronJobs['red-team'] = cl.schedule('0 * * * *', async function() { try { await redTeamAgent.run(); } catch (e) { console.error('[RED TEAM ERR]', e.message); } });
     cronJobs['dlp-stats'] = cl.schedule('0 */6 * * *', async function() { try { await dlpAgent.run(); } catch (e) { console.error('[DLP STATS ERR]', e.message); } });
     
-    console.log('Cron: 10 jobs scheduled (Sensory + System Swarm active)');
+    cronJobs['strategic-analyst'] = cl.schedule('0 */2 * * *', async function() { try { await strategicAnalystAgent.run(); } catch (e) { console.error('[STRATEGIC ANALYST ERR]', e.message); } });
+    console.log('Cron: 11 jobs scheduled (Cognitive Synthesis active)');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
