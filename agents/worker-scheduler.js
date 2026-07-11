@@ -10,7 +10,6 @@ const SCHEDULE = [
   ['./intelligence/china_company_agent.js',      5  * 60000, 1],
   ['./analysis/trend_prediction_agent.js',      10  * 60000, 2],
   ['./analysis/sentiment_analysis_agent.js',    10  * 60000, 2],
-  ['./analysis/model-benchmarking-engine.js',   30  * 60000, 2],
   ['./learning/learning_agent.js',              20  * 60000, 3],
   ['./learning/approval_agent.js',              30  * 60000, 3],
 ];
