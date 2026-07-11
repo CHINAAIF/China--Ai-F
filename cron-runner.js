@@ -15,8 +15,7 @@ const PIPELINES = [
     agents: [
       './agents/intelligence/china-news-agent.js',
       './agents/governance/verification-agent.js',
-      './agents/intelligence/pricing-tracker-agent.js',
-    ]
+          ]
   },
   {
     name: 'analysis-pipeline',
