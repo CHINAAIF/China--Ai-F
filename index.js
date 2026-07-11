@@ -535,7 +535,8 @@ function setupCron(cl) {
     cronJobs['dlp-stats'] = cl.schedule('0 */6 * * *', async function() { try { await dlpAgent.run(); } catch (e) { console.error('[DLP STATS ERR]', e.message); } });
     
     cronJobs['strategic-analyst'] = cl.schedule('0 */2 * * *', async function() { try { await strategicAnalystAgent.run(); } catch (e) { console.error('[STRATEGIC ANALYST ERR]', e.message); } });
-    console.log('Cron: 11 jobs scheduled (Cognitive Synthesis active)');
+    cronJobs['adversarial-verifier'] = cl.schedule('0 */3 * * *', async function() { try { await adversarialVerifierAgent.run(); } catch (e) { console.error('[ADVERSARIAL VERIFIER ERR]', e.message); } });
+    console.log('Cron: 12 jobs scheduled (Adversarial Verification active)');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
