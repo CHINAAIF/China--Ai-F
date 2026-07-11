@@ -1,91 +1,45 @@
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
-import { safeGroqJSON } from '../../lib/services/safe-json.js';
+import { BaseAgent } from '../base-agent.js';
+import { mutateData } from '../../lib/tools/sql-tool.js';
+import { writeMemory } from '../../lib/blackboard.js';
 
-const pool = getPool('intelligence');
+class ChinaNewsAgent extends BaseAgent {
+  constructor() {
+    super('china_news_agent', 'intelligence');
+    this.topics = ['Chinese AI models 2025', 'DeepSeek latest news', 'Alibaba Qwen updates', 'Baidu ERNIE AI'];
+  }
 
-async function runStandalone() {
-  console.log('📰 China News Agent Starting...');
-  await pool.query(`UPDATE agent_registry SET status='running', last_run=NOW() WHERE agent_name='china_news_agent'`).catch(() => {});
-  await pool.query(`UPDATE agent_heartbeat SET status='alive', last_ping=NOW() WHERE agent_name='china_news_agent'`).catch(() => {});
+  async run() {
+    let totalProcessed = 0;
 
-  const topics = [
-    'Chinese AI models 2025',
-    'DeepSeek latest news',
-    'Alibaba Qwen updates',
-    'Baidu ERNIE AI',
-    'China AI regulation policy'
-  ];
+    for (const topic of this.topics) {
+      try {
+        const prompt = `Summarize the latest news about: ${topic}. Return JSON: {"title":"...","summary":"...","importance":1-10,"sentiment":"positive|negative|neutral"}`;
+        
+        const inference = await this.think(prompt, 'You are a helpful AI news assistant.');
+        if (inference.error || !inference.data) continue;
 
-  let totalProcessed = 0;
-  for (const topic of topics) {
-    try {
-      const prompt = `Search and summarize latest news about: ${topic}. Return JSON: {"title":"...","summary":"...","importance":1-10,"sentiment":"positive|negative|neutral"}`;
-      
-      // استخدام البوابة الموحدة والتحقق التلقائي
-      const result = await safeGroqJSON(prompt, 'You are a helpful AI news assistant.', 'china_news_agent');
-
-      if (result.error || !result.data) {
-        throw new Error(result.error || 'Inference failed');
+        const data = inference.data;
+        const sql = `INSERT INTO intelligence_raw (agent_name, content_type, raw_content, title, category, importance_score, sentiment, is_verified, collected_at)
+                     VALUES ($1, 'news', $2, $3, 'chinese_ai', $4, $5, false, NOW()) ON CONFLICT DO NOTHING`;
+        const params = [this.name, data.summary, data.title, data.importance || 5, data.sentiment || 'neutral'];
+        
+        const intent = { agentName: this.name, userId: 'sovereign_system', action: 'execute_sql_write', layer: 'intelligence', origin: 'system', table: 'intelligence_raw' };
+        
+        const dbResult = await mutateData(sql, params, 'intelligence', this.name, 'sovereign_system', intent);
+        if (dbResult.success) totalProcessed++;
+        
+      } catch (e) {
+        console.error(`[${this.name}] Error processing ${topic}:`, e.message);
       }
-
-      const data = result.data;
-
-      await pool.query(
-        `INSERT INTO intelligence_raw (agent_name, content_type, raw_content, title, category, importance_score, sentiment, is_verified, collected_at)
-         VALUES ('china_news_agent','news',$1,$2,'chinese_ai',$3,$4,false,NOW())`,
-        [data.summary, data.title, data.importance || 5, data.sentiment || 'neutral']
-      ).catch(() => {});
-
-      totalProcessed++;
-      console.log(`✅ ${topic}: importance=${data.importance}`);
-      await new Promise(r => setTimeout(r, 500));
-    } catch(e) {
-      console.error(`⚠️ ${topic}: ${e.message}`);
     }
-  }
 
-  await pool.query(`UPDATE agent_registry SET status='active', last_run=NOW(), run_count=COALESCE(run_count,0)+1 WHERE agent_name='china_news_agent'`).catch(() => {});
-  console.log(`\n🏁 China News Agent Complete: ${totalProcessed}/${topics.length} topics processed`);
+    if (totalProcessed > 0) {
+      await writeMemory('intel:new_china_news', { count: totalProcessed, timestamp: Date.now() }, 3600);
+    }
 
-  if (process.argv[1]?.includes('intelligence/china-news-agent.js')) {
-    await pool.end();
-  }
-}
-
-// ── export للـregistry/scheduler ────────────────────────────────
-export async function run(input = {}) {
-  try {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*) as cnt FROM intelligence_raw WHERE agent_name='china_news_agent' AND collected_at > NOW() - INTERVAL '24 hours'`
-    );
-    return {
-      success: true,
-      data: {
-        agent: 'china_news_agent',
-        articles_24h: parseInt(rows[0].cnt),
-        status: 'ready',
-        confidence: 85
-      }
-    };
-  } catch(e) {
-    return { success: false, error: e.message };
+    return { success: true, processed: totalProcessed };
   }
 }
 
-export default { name: 'china_news_agent', layer: 'intelligence', run };
-
-// ── standalone ───────────────────────────────────────────────────
-const isMain = process.argv[1]?.includes('intelligence/china-news-agent.js');
-if (isMain) {
-  runStandalone().catch(async err => {
-    console.error('FATAL:', err.message);
-    await pool.query(
-      `INSERT INTO agent_circuit_breaker (agent_name, state, failure_count, last_failure)
-       VALUES ('china_news_agent','open',1,NOW())
-       ON CONFLICT (agent_name) DO UPDATE SET
-         failure_count=agent_circuit_breaker.failure_count+1,
-         last_failure=NOW()`
-    ).catch(() => {});
-    process.exit(1);
-  });
-}
+export const chinaNewsAgent = new ChinaNewsAgent();
+export default chinaNewsAgent;

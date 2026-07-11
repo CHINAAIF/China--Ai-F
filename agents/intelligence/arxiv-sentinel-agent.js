@@ -1,60 +1,47 @@
-// TRUNKIA - arXiv Sentinel Agent
-// Team Engineering Standards: 60-Layer Filtered
-// يكتشف الأبحاث الجديدة على arXiv قبل المنافسين
+import { BaseAgent } from '../base-agent.js';
+import { mutateData } from '../../lib/tools/sql-tool.js';
+import { writeMemory } from '../../lib/blackboard.js';
 
-import { multiModel } from '../governance/multi-model.js';
-import crypto from 'crypto';
+class ArxivSentinelAgent extends BaseAgent {
+  constructor() {
+    super('arxiv_sentinel', 'intelligence');
+  }
 
-const AGENT_NAME = 'arxiv-sentinel';
+  async run(topic = 'Artificial Intelligence') {
+    try {
+      const prompt = `List the 3 most recent and important AI research papers about "${topic}". Return ONLY a valid JSON array: [{"title": "...", "abstract": "...", "url": "..."}]`;
+      
+      // 1. التفكير الآمن عبر البوابة (محمي من الـ Injection)
+      const inference = await this.think(prompt, 'You are an AI research analyst.');
+      if (inference.error || !inference.data) throw new Error(inference.error || 'Inference failed');
 
-export class ArxivSentinelAgent {
-    constructor() {
-        this.name = AGENT_NAME;
-        this.layer = 'intelligence';
+      const papers = inference.data;
+      let inserted = 0;
+
+      // 2. الكتابة السيادية في قاعدة البيانات
+      for (const paper of papers) {
+        const sql = `INSERT INTO intelligence_raw (agent_name, content_type, raw_content, title, category, is_verified, collected_at)
+                     VALUES ($1, 'research', $2, $3, 'arxiv', false, NOW()) ON CONFLICT DO NOTHING`;
+        const params = [this.name, paper.abstract || 'No abstract', paper.title || 'Untitled'];
+        
+        // النية: النظام هو من يكتب (origin: 'system')، وليس الـ LLM
+        const intent = { agentName: this.name, userId: 'sovereign_system', action: 'execute_sql_write', layer: 'intelligence', origin: 'system', table: 'intelligence_raw' };
+        
+        const dbResult = await mutateData(sql, params, 'intelligence', this.name, 'sovereign_system', intent);
+        if (dbResult.success) inserted++;
+      }
+
+      // 3. الإذاعة في الذاكرة المشتركة (إيقاظ وكلاء التحليل)
+      if (inserted > 0) {
+        await writeMemory('intel:new_research', { topic, count: inserted, timestamp: Date.now() }, 3600);
+      }
+
+      return { success: true, inserted, model: inference.model };
+    } catch (error) {
+      console.error(`[${this.name}] Error:`, error.message);
+      return { success: false, error: error.message };
     }
-
-    async scan(topic) {
-        if (!topic || typeof topic !== 'string') {
-            return { success: false, error: 'Invalid topic' };
-        }
-
-        const systemPrompt = 'You are an AI research analyst. Return ONLY a valid JSON array. No other text.';
-        const userPrompt = `TASK: List the 3 most recent and important AI research papers about "${topic}" from arXiv or similar venues.\n\nReturn ONLY a JSON array with objects like:\n[{"title": "...", "authors": ["..."], "abstract": "...", "url": "https://arxiv.org/abs/...", "year": 2026}]\nIf you cannot find real papers, return an empty array [].\n\nDo NOT include any other text.`;
-
-        try {
-            const result = await multiModel.runSingle('research_analysis', userPrompt, systemPrompt);
-
-            if (!result?.approved || !result.content) {
-                return { success: false, error: 'AI analysis failed' };
-            }
-
-            const papers = this._extractJSON(result.content);
-            if (!papers) {
-                return { success: false, error: 'Failed to parse AI response' };
-            }
-
-            return { success: true, data: papers, model: result.model };
-
-        } catch (error) {
-            console.error(`[${AGENT_NAME}] Error: ${error.message}`);
-            return { success: false, error: error.message };
-        }
-    }
-
-    _extractJSON(text) {
-        if (!text) return null;
-        let cleaned = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
-        const match = cleaned.match(/\[[\s\S]*\]/);
-        if (match) {
-            try {
-                return JSON.parse(match[0]);
-            } catch (e) {
-                console.error(`[${AGENT_NAME}] JSON parse error: ${e.message}`);
-                return null;
-            }
-        }
-        return null;
-    }
+  }
 }
 
 export const arxivSentinelAgent = new ArxivSentinelAgent();
