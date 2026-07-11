@@ -536,7 +536,8 @@ function setupCron(cl) {
     
     cronJobs['strategic-analyst'] = cl.schedule('0 */2 * * *', async function() { try { await strategicAnalystAgent.run(); } catch (e) { console.error('[STRATEGIC ANALYST ERR]', e.message); } });
     cronJobs['adversarial-verifier'] = cl.schedule('0 */3 * * *', async function() { try { await adversarialVerifierAgent.run(); } catch (e) { console.error('[ADVERSARIAL VERIFIER ERR]', e.message); } });
-    console.log('Cron: 12 jobs scheduled (Adversarial Verification active)');
+    cronJobs['sovereign-decision'] = cl.schedule('0 */4 * * *', async function() { try { await sovereignDecisionAgent.run(); } catch (e) { console.error('[SOVEREIGN DECISION ERR]', e.message); } });
+    console.log('Cron: 13 jobs scheduled (Sovereign Decision active)');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
