@@ -16,7 +16,7 @@ if (process.env.SENTRY_DSN) {
   });
   console.log('[INFO] Sentry initialized successfully.');
 } else {
-  console.warn('[WARN] SENTRY_DSN not set. Error tracking is disabled.');
+  console.log('[INFO] SENTRY_DSN not set. Error tracking disabled.');
 }
 
 import { runGovernanceMonitor } from './scripts/governance-monitor.js';

@@ -50,7 +50,7 @@ export function loadEnvironment() {
     const optionalVars = ['SENTRY_DSN', 'ALERT_WEBHOOK_URL'];
     optionalVars.forEach(varName => {
         if (!process.env[varName]) {
-            console.warn(`[WARN] Optional variable ${varName} is not set. Monitoring features may be degraded.`);
+            console.log(`[INFO] Optional variable ${varName} is not set. Monitoring features are disabled.`);
         }
     });
 

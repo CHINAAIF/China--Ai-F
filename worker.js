@@ -5,7 +5,7 @@ import { handleSovereignInference } from './lib/sovereign-inference-router.mjs';
 const redisUrl = process.env.REDIS_URL;
 
 if (!redisUrl) {
-  console.warn('[WORKER] WARN: REDIS_URL is not set. Worker process is idle (No jobs to process).');
+  console.log('[WORKER] INFO: REDIS_URL not set. Worker process idle (Development mode).');
   // يبقى العملية حية ولكن لا تفعل شيئاً لمنع استنزاف الموارد
   setInterval(() => {}, 1000000); 
 } else {
