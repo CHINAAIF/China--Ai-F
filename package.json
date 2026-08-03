@@ -16,7 +16,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@sentry/node": "^10.64.0",
+    "@sentry/node": "^10.68.0",
     "bullmq": "^5.79.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
