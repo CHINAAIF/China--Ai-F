@@ -101,6 +101,7 @@ app.use(cors({
     }
     
     // 3. رفض أي طلب لا يطابق القائمة البيضاء الصارمة
+    if (process.env.NODE_ENV !== 'production' && (!origin || origin.includes('localhost'))) return callback(null, true);
     return callback(new Error('CORS blocked: Strict Origin Policy'));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
