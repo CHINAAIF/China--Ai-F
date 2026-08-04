@@ -2,7 +2,6 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { semanticCache } from '../../lib/semantic-cache.js';
 import { isSafePrompt, SAFE_BLOCK_RESPONSE } from '../../lib/input-guard.js';
 import { dlpEngine } from '../../lib/dlp-engine.js';
 
@@ -92,11 +91,7 @@ class InferenceGateway {
     }
 
     // 1. فحص الـ Semantic Cache أولاً (Zero-Cost Path)
-    const cached = semanticCache.search(prompt, userId);
-    if (cached) {
-      return cached;
-    }
-
+    
     // 2. إذا لم يكن موجوداً، نستدعي المزود
     const candidates = this.getBestProviders(taskType);
     if (candidates.length === 0) {
@@ -130,8 +125,6 @@ class InferenceGateway {
           latency_ms: latency
         };
 
-        // 3. تخزين النتيجة الناجحة في الـ Cache لطلب يستفيد منها مستقبلاً
-        semanticCache.store(prompt, result, userId, result.tokens);
 
         return result;
 
