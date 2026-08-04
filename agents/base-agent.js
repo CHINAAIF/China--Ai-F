@@ -14,6 +14,7 @@ export class BaseAgent {
     this.status = 'active';
     this.isTerminated = false;
     this.anomalyScore = 0;
+    this.memoryToken = generateMemoryToken(this.name);
 
     // AOP Wrapper: Enforce Apoptosis check on run() even if overridden by subclass
     const originalRun = this.run.bind(this);
