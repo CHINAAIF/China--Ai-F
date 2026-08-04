@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'; import crypto from 'crypto';
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // SOVEREIGN MEMORY ENGINE v2.0
@@ -7,7 +7,7 @@ import { getPool } from '../../lib/db.js';
 // المعايير: Enterprise-grade RAG Immunization
 // ═══════════════════════════════════════════════════════════════════
 
-const pool = getPool('main');
+const pool = getPool('main', generateDbToken('agents/rag/sovereign-memory.js'));
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {

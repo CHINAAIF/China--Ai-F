@@ -2,7 +2,8 @@
  * price_prediction_agent | layer: analysis
  * منطق Groq حقيقي — يستخدم safe-json.js
  */
-import dotenv from 'dotenv'; import { pool } from '../../lib/services/db.js';
+import dotenv from 'dotenv'; import { getPool, generateDbToken } from './../../lib/db.js';
+const pool = getPool('main', generateDbToken('agents/analysis/price_prediction_agent.js'));;
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 

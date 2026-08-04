@@ -4,11 +4,11 @@ import { logExecution, safeStep } from '../../lib/services/executor.js';
  * العقلية 19: كل nonce مستخدم يُسجَّل ويُرفض إعادة استخدامه
  * nonce_registry أعمدة: nonce, agent_id, customer_id, used_at, expires_at, rejected
  */
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 
 const connectionString = process.env.NODE_ENV === 'test' ? process.env.DATABASE_URL : (process.env.DATABASE_URL_GOVERNANCE || process.env.DATABASE_URL);
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/replay-guard.js'));
 const WINDOW_SECONDS = 30;
 
 class ReplayGuard {

@@ -1,9 +1,9 @@
 import { logExecution, safeStep } from '../../lib/services/executor.js';
 import dotenv from 'dotenv'; 
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
-const pool = getPool('learning');
+const pool = getPool('learning', generateDbToken('agents/learning/ground-truth-validator.js'));
 
 class GroundTruthValidator {
   constructor() {

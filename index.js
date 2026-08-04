@@ -24,7 +24,7 @@ import { runGovernanceMonitor } from './scripts/governance-monitor.js';
 import { secureOutput } from "./security_bridge.js";
 import { scraperGuard } from "./botDefense.js";
 import crypto from 'crypto';
-import { pool } from './lib/db.js';
+import { getPool as secureGetPool, generateDbToken } from './lib/db.js';
 import { sanitizeInput, estimateTokens, classifyTask, executeInference, analyzePromptLocally, sanitizeOutput, logInferenceAsync, getContextMessages, saveContextMessage, logCognitiveTurn, checkAndUpdateSessionRisk, engageHoneypot } from './lib/inference.js';;;
 import { checkBehavioralAnomaly, evaluateWithCritics, updateBehavioralBaseline, detectDarkNetwork } from './lib/immune-system.mjs';
 import './lib/cognitive-optimizer.mjs';
@@ -232,13 +232,7 @@ function fixDbUrl(url) {
 }
 
 function getPool() {
-  if (!pool) {
-    var dbUrl = fixDbUrl(process.env.DATABASE_URL);
-    if (!dbUrl) throw new Error('DATABASE_URL is not set');
-    pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: true } });
-    pool.on('error', function(err) { console.error('[POOL ERROR]', err.message); circuitRecordFailure(); });
-  }
-  return pool;
+  return secureGetPool('main', generateDbToken('index.js'));
 }
 async function safeQuery(sql, params) {
   if (circuitIsOpen()) throw new Error('CIRCUIT_OPEN: Too many DB failures');

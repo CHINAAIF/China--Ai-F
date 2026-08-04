@@ -1,8 +1,8 @@
 /**
  * TRUNKIA Circuit Breaker v1.0
  */
-import { getPool } from '../../lib/db.js';
-const pool = getPool('main');
+import { getPool, generateDbToken } from '../../lib/db.js';
+const pool = getPool('main', generateDbToken('agents/routing/circuit-breaker.js'));
 
 class CircuitBreaker {
   constructor(){

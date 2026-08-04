@@ -1,8 +1,8 @@
 import dotenv from 'dotenv'; 
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
-const pool = getPool('intelligence');
+const pool = getPool('intelligence', generateDbToken('agents/intelligence/pricing_oracle_agent.js'));
 
 class PricingOracleAgent {
   constructor() {                                                                                                                       this.name = 'pricing_oracle_agent';

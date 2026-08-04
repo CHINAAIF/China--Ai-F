@@ -3,10 +3,10 @@ import { logExecution, safeStep } from '../../lib/services/executor.js';
  * policy-enforcer | layer: governance
  * FIX FINAL: hash يُحسب على content::text بعد INSERT — يطابق pg دائماً
  */
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
+import dotenv from 'dotenv'; import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/policy-enforcer.js'));
 
 class PolicyEnforcer {
   constructor() {

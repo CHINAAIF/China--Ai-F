@@ -1,4 +1,5 @@
-import { pool } from './lib/db.js';
+import { getPool, generateDbToken } from './lib/db.js';
+const pool = getPool('main', generateDbToken('run-schema-v5.mjs'));;
 import fs from 'fs';
 async function runWithRetry(sql, partName, retries, delay) {
   for (var i = 0; i < retries; i++) {

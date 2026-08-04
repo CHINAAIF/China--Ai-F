@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 config();
-import { pool } from '../lib/services/db.js';
+import { getPool, generateDbToken } from './../lib/db.js';
+const pool = getPool('main', generateDbToken('agents/worker-scheduler.js'));;
 
 // ── جدول الأولويات — مسارات مؤكَّدة الوجود فعلياً ──────────────
 const SCHEDULE = [

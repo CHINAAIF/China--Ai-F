@@ -1,6 +1,6 @@
 import { BaseAgent } from '../base-agent.js';
 import { monitorEventLoopDelay } from 'perf_hooks';
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import { writeMemory } from '../../lib/blackboard.js';
 
 /**
@@ -67,7 +67,7 @@ class FaultDetectorAgent extends BaseAgent {
 
     // 3. فحص تشبع تجمع الاتصالات (DB Pool Saturation)
     try {
-      const pool = getPool('main');
+      const pool = getPool('main', generateDbToken('agents/system/fault-detector-agent.js'));
       // totalCount = idle + waiting
       // إذا كان هناك الكثير من الطلبات المعلقة (waiting)، فهذا يعني أن DB لا يستجيب
       const poolSaturation = pool.totalCount - pool.idleCount;

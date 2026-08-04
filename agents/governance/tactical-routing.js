@@ -4,11 +4,11 @@ import { logExecution, safeStep } from '../../lib/services/executor.js';
  * قلب Governance Layer — يختار المزود + يسجل في routing_decisions + event_log
  * العقليات: 3(AI أداة) + 12(Router يوجّه) + 13(Causal) + 14(Temporal) + 18(Anomaly)
  */
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
+import dotenv from 'dotenv'; import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/tactical-routing.js'));
 
 class TacticalRouter {
   constructor() {

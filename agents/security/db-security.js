@@ -1,4 +1,4 @@
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 
 
 
@@ -8,7 +8,7 @@ if (!process.env.DATABASE_URL_SECURITY) {
   );
 }
 
-export const pool = getPool('security');
+export const pool = getPool('security', generateDbToken('agents/security/db-security.js'));
 
 pool.on('error', (err) => {
   console.error('CRITICAL: Security database pool error:', err.message);

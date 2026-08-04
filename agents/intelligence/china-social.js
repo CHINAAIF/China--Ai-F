@@ -1,9 +1,9 @@
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import { multiModel } from '../governance/multi-model.js';
 import { governor } from '../governance/governor.js';
 import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
-const pool = getPool('intelligence');
+const pool = getPool('intelligence', generateDbToken('agents/intelligence/china-social.js'));
 
 export class ChinaSocialAgent {
   constructor() {

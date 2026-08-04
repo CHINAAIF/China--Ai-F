@@ -1,9 +1,9 @@
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 import { logExecution, safeStep, tableExists } from '../../lib/services/executor.js';
 
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/audit-gateway-v2.js'));
 
 // ── Schema المسموح به لكل نوع بيانات ────────────────────────────
 const ALLOWED_SCHEMAS = {

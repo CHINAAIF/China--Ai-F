@@ -1,4 +1,4 @@
-import { getPool } from '../../lib/db.js'; import dotenv from 'dotenv'; const pool = getPool('intelligence');
+import { getPool, generateDbToken } from '../../lib/db.js'; import dotenv from 'dotenv'; const pool = getPool('intelligence', generateDbToken('agents/intelligence/data-quality-agent.js'));
 class DQAgent{
   async audit(){
     console.log('=== DATA QUALITY ===');

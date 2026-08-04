@@ -1,0 +1,169 @@
+{
+  "agents/base-agent.js": [
+    "lib/blackboard.js",
+    "lib/services/safe-json.js"
+  ],
+  "agents/governance/multi-model.js": [
+    "lib/dlp-engine.js",
+    "lib/input-guard.js",
+    "lib/semantic-cache.js"
+  ],
+  "agents/governance/policy-enforcer.js": [
+    "lib/db.js",
+    "lib/services/executor.js"
+  ],
+  "agents/governance/tactical-routing.js": [
+    "lib/db.js",
+    "lib/services/executor.js",
+    "lib/services/safe-json.js"
+  ],
+  "agents/intelligence/arxiv-sentinel-agent.js": [
+    "agents/base-agent.js",
+    "lib/blackboard.js",
+    "lib/tools/sql-tool.js"
+  ],
+  "agents/intelligence/strategic-intelligence-agent.js": [
+    "agents/governance/multi-model.js"
+  ],
+  "agents/system/dlp-agent.js": [
+    "agents/base-agent.js",
+    "lib/blackboard.js",
+    "lib/dlp-engine.js"
+  ],
+  "agents/system/fault-detector-agent.js": [
+    "agents/base-agent.js",
+    "lib/blackboard.js",
+    "lib/db.js"
+  ],
+  "agents/system/red-team-agent.js": [
+    "agents/base-agent.js",
+    "agents/governance/multi-model.js",
+    "lib/blackboard.js"
+  ],
+  "agents/system/self-healer-agent.js": [
+    "agents/base-agent.js",
+    "lib/blackboard.js",
+    "lib/semantic-cache.js"
+  ],
+  "botDefense.js": [],
+  "config/env.js": [],
+  "core/security/scanner.js": [],
+  "index.js": [
+    "agents/governance/multi-model.js",
+    "agents/intelligence/arxiv-sentinel-agent.js",
+    "agents/intelligence/strategic-intelligence-agent.js",
+    "agents/system/dlp-agent.js",
+    "agents/system/fault-detector-agent.js",
+    "agents/system/red-team-agent.js",
+    "agents/system/self-healer-agent.js",
+    "botDefense.js",
+    "config/env.js",
+    "lib/admin-guard.js",
+    "lib/cognitive-optimizer.mjs",
+    "lib/db.js",
+    "lib/iam-gateway.mjs",
+    "lib/immune-system.mjs",
+    "lib/inference.js",
+    "lib/job-queue.js",
+    "lib/semantic-cache.js",
+    "lib/sovereign-inference-router.mjs",
+    "scripts/governance-monitor.js",
+    "security_bridge.js"
+  ],
+  "lib/admin-guard.js": [],
+  "lib/blackboard.js": [],
+  "lib/cognitive-optimizer.mjs": [
+    "lib/db.js"
+  ],
+  "lib/constitution-engine.js": [],
+  "lib/crypto-binding.js": [
+    "lib/security-core.js"
+  ],
+  "lib/db.js": [],
+  "lib/dlp-engine.js": [],
+  "lib/governance-audit-chain.js": [],
+  "lib/iam-gateway.mjs": [
+    "lib/db.js"
+  ],
+  "lib/immune-system.mjs": [
+    "lib/db.js"
+  ],
+  "lib/inference.js": [
+    "lib/db.js"
+  ],
+  "lib/input-guard.js": [],
+  "lib/job-queue.js": [],
+  "lib/pii-redactor.js": [
+    "lib/security-core.js"
+  ],
+  "lib/security-core.js": [],
+  "lib/semantic-cache.js": [],
+  "lib/services/db.js": [
+    "lib/db.js"
+  ],
+  "lib/services/executor.js": [
+    "lib/services/db.js"
+  ],
+  "lib/services/gateway-sentinel.js": [
+    "lib/services/db.js"
+  ],
+  "lib/services/knowledge-distiller.js": [
+    "lib/tools/sql-tool.js"
+  ],
+  "lib/services/safe-json.js": [
+    "agents/governance/multi-model.js",
+    "lib/services/db.js",
+    "lib/services/executor.js",
+    "lib/services/gateway-sentinel.js",
+    "lib/services/knowledge-distiller.js",
+    "lib/services/semantic-firewall.js"
+  ],
+  "lib/services/semantic-firewall.js": [
+    "lib/services/db.js"
+  ],
+  "lib/sovereign-auditor.mjs": [
+    "lib/inference.js"
+  ],
+  "lib/sovereign-firewall.mjs": [
+    "lib/db.js"
+  ],
+  "lib/sovereign-inference-router.mjs": [
+    "lib/inference.js",
+    "lib/pii-redactor.js",
+    "lib/sovereign-auditor.mjs",
+    "lib/sovereign-firewall.mjs",
+    "lib/sovereign-orchestrator.mjs",
+    "lib/sovereign-protocol.js",
+    "lib/sovereign-validator.mjs"
+  ],
+  "lib/sovereign-kernel.js": [
+    "lib/security-core.js"
+  ],
+  "lib/sovereign-orchestrator.mjs": [
+    "agents/governance/multi-model.js",
+    "agents/governance/policy-enforcer.js",
+    "agents/governance/tactical-routing.js",
+    "lib/blackboard.js"
+  ],
+  "lib/sovereign-protocol.js": [
+    "agents/governance/multi-model.js",
+    "lib/pii-redactor.js"
+  ],
+  "lib/sovereign-validator.mjs": [
+    "lib/iam-gateway.mjs",
+    "lib/inference.js"
+  ],
+  "lib/tools/sql-tool.js": [
+    "lib/constitution-engine.js",
+    "lib/crypto-binding.js",
+    "lib/db.js",
+    "lib/sovereign-kernel.js"
+  ],
+  "scripts/governance-monitor.js": [
+    "config/env.js",
+    "lib/governance-audit-chain.js"
+  ],
+  "security_bridge.js": [
+    "core/security/scanner.js"
+  ]
+}

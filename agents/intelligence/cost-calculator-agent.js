@@ -1,4 +1,4 @@
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js'; const pool = getPool('intelligence');
+import dotenv from 'dotenv'; import { getPool, generateDbToken } from '../../lib/db.js'; const pool = getPool('intelligence', generateDbToken('agents/intelligence/cost-calculator-agent.js'));
 class CostCalcAgent {
   constructor(){this.name='cost_calculator';this.version='1.0.0';}
   async calculate(params){

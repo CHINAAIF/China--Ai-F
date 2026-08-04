@@ -1,8 +1,8 @@
-import dotenv from 'dotenv'; import { getPool } from '../../lib/db.js';
+import dotenv from 'dotenv'; import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 import { tableExists } from '../../lib/services/executor.js';
 
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/agent-supervisor.js'));
 const MASTER_KEY = process.env.ENCRYPTION_KEY;
 const HEARTBEAT_TIMEOUT_MS = 5 * 60000;
 

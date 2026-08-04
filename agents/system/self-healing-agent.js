@@ -1,4 +1,4 @@
-import { getPool } from '../../lib/db.js'; import dotenv from 'dotenv'; const pool = getPool('main');
+import { getPool, generateDbToken } from '../../lib/db.js'; import dotenv from 'dotenv'; const pool = getPool('main', generateDbToken('agents/system/self-healing-agent.js'));
 class SHAgent{
   async heal(){
     console.log('=== SELF-HEALING ===');

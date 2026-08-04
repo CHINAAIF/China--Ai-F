@@ -1,8 +1,8 @@
 /**
  * TRUNKIA Execution Engine v1.0 — Dark Factory
  */
-import { getPool } from '../../lib/db.js';
-const pool = getPool('main');
+import { getPool, generateDbToken } from '../../lib/db.js';
+const pool = getPool('main', generateDbToken('agents/execution/execution-engine.js'));
 
 class ExecutionEngine {
   constructor(){

@@ -1,11 +1,11 @@
 // TRUNKIA - Governance Layer Database Connection (ISOLATED)
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 
 if (!process.env.DATABASE_URL_GOVERNANCE) {
   throw new Error('CRITICAL: DATABASE_URL_GOVERNANCE is not set. Refusing to start.');
 }
 
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/db-governance.js'));
 
 pool.on('error', (err) => {
   console.error('[GOVERNANCE DB] Pool error:', err.message);

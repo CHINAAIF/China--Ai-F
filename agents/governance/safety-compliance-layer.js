@@ -1,4 +1,4 @@
-import { getPool } from '../../lib/db.js';
+import { getPool, generateDbToken } from '../../lib/db.js';
 import crypto from 'crypto';
 import { tableExists } from '../../lib/services/executor.js';
 
@@ -12,7 +12,7 @@ const sslConfig = isProduction
   ? { rejectUnauthorized: true, ca: process.env.DB_CA_CERT } : { rejectUnauthorized: false };
 
 // ── Pool محمي ─────────────────────────────────────────────────
-const pool = getPool('governance');
+const pool = getPool('governance', generateDbToken('agents/governance/safety-compliance-layer.js'));
 
 pool.on('error', (err) => console.error('[safety-compliance] Pool error:', err.message));
 

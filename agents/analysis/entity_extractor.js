@@ -1,6 +1,7 @@
 import { logExecution, safeStep } from '../../lib/services/executor.js';
 import { config } from 'dotenv'; config();
-import { pool } from '../../lib/services/db.js';
+import { getPool, generateDbToken } from './../../lib/db.js';
+const pool = getPool('main', generateDbToken('agents/analysis/entity_extractor.js'));;
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 import { createHash } from 'crypto';
 
