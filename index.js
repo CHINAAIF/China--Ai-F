@@ -437,17 +437,14 @@ app.post('/api/inference/chat', async (req, res) => {
     const taskType = classifyTask(sanitized);
     const contextMessages = await getContextMessages(session_id, sanitized);
     const startTime = Date.now();
-    const inferenceResult = await executeInference(contextMessages, taskType);
+    const promptText = Array.isArray(contextMessages) ? JSON.stringify(contextMessages) : contextMessages;
+    const sipResult = await sovereignProtocol.execute(promptText, taskType);
     const latency = Date.now() - startTime;
-    if (!inferenceResult.success) {
-      await logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used || 'NONE', latency_ms: latency, tokens_in: 0, tokens_out: 0, cost_usd: 0, outcome: 'failed' });
-      return res.status(502).json({ error: inferenceResult.error || 'INFERENCE_FAILED' });
-    }
-    const safeContent = sanitizeOutput(inferenceResult.content);
+    const safeContent = sanitizeOutput(sipResult.content);
     await saveContextMessage(session_id, 'user', sanitized);
     await saveContextMessage(session_id, 'assistant', safeContent);
     logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
-    res.json({ success: true, content: safeContent, model: inferenceResult.model_used, provider: inferenceResult.provider, session_id, pii_flags: flags });
+    res.json({ success: true, content: safeContent, model: sipResult.attestation.chain[2].data.primary_model, session_id, pii_flags: flags, sovereign_attestation: sipResult.attestation });
   } catch (err) { res.status(500).json({ error: 'INTERNAL_ERROR' }); }
 });
 
