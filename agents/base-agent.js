@@ -1,9 +1,10 @@
 /**
- * TRUNKIA Standard Agent Base Class (With Digital Apoptosis)
- * أي وكيل جديد يجب أن يرث من هذا الكلاس لضمان التوافق التام مع الذاكرة المشتركة والبوابة.
+ * TRUNKIA Standard Agent Base Class (Instant Fortified Apoptosis)
+ * Features: Cyber Assassination Prevention, Audit Chain Logging, Death Broadcast, Non-Blocking Instant Kill.
  */
 import { writeMemory, readMemory } from '../lib/blackboard.js';
 import { safeGroqJSON } from '../lib/services/safe-json.js';
+import { recordAuditEvent } from '../lib/immune-system.mjs';
 
 export class BaseAgent {
   constructor(name, layer) {
@@ -11,7 +12,7 @@ export class BaseAgent {
     this.name = name;
     this.layer = layer;
     this.status = 'active';
-    this.isTerminated = false; // Apoptosis Flag
+    this.isTerminated = false;
     this.anomalyScore = 0;
 
     // AOP Wrapper: Enforce Apoptosis check on run() even if overridden by subclass
@@ -22,34 +23,45 @@ export class BaseAgent {
     };
   }
 
-  // Digital Apoptosis: Programmed Cell Death
-  async triggerApoptosis(reason) {
-    if (this.isTerminated) return;
-    console.warn(`[APOPTOSIS] Agent ${this.name} initiating self-destruct. Reason: ${reason}`);
-    
-    this.isTerminated = true;
-    this.status = 'terminated';
-    
-    // 1. Wipe local memory from Blackboard (Overwrite with dead state and 1s TTL)
-    try {
-      await writeMemory(`agent:${this.name}`, { status: 'terminated', reason }, 1);
-    } catch (e) {}
-  }
-
-  // Check if agent is alive before executing any cognitive function
   _checkVitals() {
     if (this.isTerminated) {
       throw new Error(`[APOPTOSIS] Agent ${this.name} is dead. Execution aborted.`);
     }
   }
 
-  // Receive anomaly signals from Immune System
   async reportAnomaly(score) {
     if (this.isTerminated) return;
     this.anomalyScore += score;
-    if (this.anomalyScore > 10) { // Threshold for self-destruct
-      await this.triggerApoptosis(`Anomaly score exceeded threshold (${this.anomalyScore})`);
+    if (this.anomalyScore > 10) {
+      await this.triggerApoptosis(`Self-reported anomaly (${this.anomalyScore})`, process.env.SYSTEM_EXECUTION_KEY);
     }
+  }
+
+  // Protected method: Requires system key to prevent Cyber Assassination
+  async triggerApoptosis(reason, executionKey = null) {
+    if (this.isTerminated) return;
+    
+    const sysKey = process.env.SYSTEM_EXECUTION_KEY;
+    if (sysKey && executionKey !== sysKey) {
+      console.error(`[APOPTOSIS] REJECTED: Unauthorized termination attempt on ${this.name}.`);
+      return;
+    }
+
+    // Instant Local Death (Non-Blocking)
+    this.isTerminated = true;
+    this.status = 'terminated';
+    console.warn(`[APOPTOSIS] Agent ${this.name} terminated instantly. Reason: ${reason}`);
+
+    // Fire-and-Forget Cleanup (Does not block Event Loop)
+    setImmediate(async () => {
+      try {
+        await writeMemory(`agent:${this.name}`, { status: 'terminated', reason }, 1);
+        await writeMemory('system:agent_died', { agent: this.name, timestamp: Date.now() }, 10);
+        await recordAuditEvent('agent_apoptosis', this.name, 'self_terminated', { reason });
+      } catch (e) {
+        console.error(`[APOPTOSIS] Background cleanup failed for ${this.name}: ${e.message}`);
+      }
+    });
   }
 
   async initialize() {
