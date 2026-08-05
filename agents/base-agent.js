@@ -2,7 +2,7 @@
  * TRUNKIA Standard Agent Base Class (Instant Fortified Apoptosis)
  * Features: Cyber Assassination Prevention, Audit Chain Logging, Death Broadcast, Non-Blocking Instant Kill.
  */
-import { writeMemory, readMemory } from '../lib/blackboard.js';
+import { writeMemory, readMemory, generateMemoryToken } from '../lib/blackboard.js';
 import { safeGroqJSON } from '../lib/services/safe-json.js';
 import { recordAuditEvent } from '../lib/immune-system.mjs';
 
