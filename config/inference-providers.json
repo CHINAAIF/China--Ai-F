@@ -5,28 +5,44 @@
       "baseURL": "https://api.groq.com/openai/v1",
       "envKey": "GROQ_API_KEY",
       "priority": 1,
-      "models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"]
+      "models": {
+        "lite": "gemma2-9b-it",
+        "standard": "llama-3.3-70b-versatile",
+        "heavy": "llama-3.3-70b-versatile"
+      }
     },
     {
       "name": "openai",
       "baseURL": "https://api.openai.com/v1",
       "envKey": "OPENAI_API_KEY",
       "priority": 2,
-      "models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
+      "models": {
+        "lite": "gpt-4o-mini",
+        "standard": "gpt-4o",
+        "heavy": "gpt-4o"
+      }
     },
     {
       "name": "together_ai",
       "baseURL": "https://api.together.xyz/v1",
       "envKey": "TOGETHER_API_KEY",
       "priority": 3,
-      "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo"]
+      "models": {
+        "lite": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+        "standard": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "heavy": "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+      }
     },
     {
       "name": "local_ollama",
       "baseURL": "http://localhost:11434/v1",
       "envKey": "OLLAMA_ENABLED",
       "priority": 10,
-      "models": ["llama3", "qwen2.5"]
+      "models": {
+        "lite": "qwen2.5",
+        "standard": "llama3",
+        "heavy": "llama3"
+      }
     }
   ]
 }
