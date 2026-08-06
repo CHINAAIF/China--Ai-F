@@ -21,7 +21,7 @@ class ProviderState {
     this.latency = 1000;
     this.circuitOpen = false;
 
-    if (this.apiKey) {
+    if (this.apiKey || this.envKey === 'OLLAMA_ENABLED') {
       this.client = new OpenAI({ baseURL: this.baseURL, apiKey: this.apiKey });
     }
   }
@@ -84,113 +84,70 @@ class InferenceGateway {
     return available;
   }
 
-  async runSingle(taskType, prompt, systemPrompt = '', userId = 'global') {
-    // 0. جدار الحماية الدلالي: منع حقن الأوامر قبل أي معالجة
-    if (!isSafePrompt(prompt)) {
-      return SAFE_BLOCK_RESPONSE;
-    }
+  // Helper to execute inference with strict timeout
+  async _executeWithTimeout(provider, model, prompt, systemPrompt, temp, timeoutMs = 10000) {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Provider Timeout')), timeoutMs)
+    );
 
-    // 1. فحص الـ Semantic Cache أولاً (Zero-Cost Path)
-    
-    // 2. إذا لم يكن موجوداً، نستدعي المزود
-    const candidates = this.getBestProviders(taskType);
-    if (candidates.length === 0) {
-      return { approved: false, error: 'No active providers available.' };
-    }
-
-    for (const provider of candidates) {
-      const startTime = Date.now();
-      try {
-        const model = provider.models[0];
-        const res = await provider.client.chat.completions.create({
+    try {
+      const res = await Promise.race([
+        provider.client.chat.completions.create({
           model,
           messages: [
             { role: 'system', content: systemPrompt || 'You are TRUNKIA Sovereign Intelligence Core.' },
             { role: 'user', content: prompt }
           ],
           max_tokens: 1024,
-          temperature: 0.3
-        });
+          temperature: temp
+        }),
+        timeoutPromise
+      ]);
+      return { success: true, res };
+    } catch (err) {
+      return { success: false, err };
+    }
+  }
 
-        const latency = Date.now() - startTime;
-        provider.recordSuccess(latency);
+  async runSingle(taskType, prompt, systemPrompt = '', userId = 'global') {
+    if (!isSafePrompt(prompt)) return SAFE_BLOCK_RESPONSE;
 
-        const rawContent = res.choices?.[0]?.message?.content || "";
-        const dlpResult = dlpEngine.scan(rawContent, provider.name, userId);
-        const result = {
-          approved: true,
-          content: dlpResult.sanitizedContent,
-          model: `${provider.name}/${model}`,
-          tokens: res.usage?.total_tokens,
-          latency_ms: latency
-        };
+    const candidates = this.getBestProviders(taskType);
+    if (candidates.length === 0) return { approved: false, error: 'No active providers available.' };
 
-
-        return result;
-
-      } catch (err) {
+    for (const provider of candidates) {
+      const startTime = Date.now();
+      // Fix: Read model based on tier (taskType) instead of array index
+      const model = provider.models[taskType] || provider.models.standard || provider.models[0];
+      if (!model) {
         provider.recordFailure();
-        console.error(`[InferenceGateway] Provider ${provider.name} failed: ${err.message}`);
+        continue;
       }
+
+      const fetchResult = await this._executeWithTimeout(provider, model, prompt, systemPrompt, 0.3, 10000);
+
+      if (!fetchResult.success) {
+        provider.recordFailure();
+        console.error(`[InferenceGateway] Provider ${provider.name} failed: ${fetchResult.err.message}`);
+        continue;
+      }
+
+      const latency = Date.now() - startTime;
+      provider.recordSuccess(latency);
+
+      const rawContent = fetchResult.res.choices?.[0]?.message?.content || '';
+      const dlpResult = dlpEngine.scan(rawContent, provider.name, userId);
+
+      return {
+        approved: true,
+        content: dlpResult.sanitizedContent,
+        model: `${provider.name}/${model}`,
+        tokens: fetchResult.res.usage?.total_tokens,
+        latency_ms: latency
+      };
     }
 
     return { approved: false, error: 'All available inference providers failed.' };
-  }
-
-
-  async runConsensus(prompt, userId = "global") {
-    if (!isSafePrompt(prompt)) return SAFE_BLOCK_RESPONSE;
-    const candidates = this.getBestProviders("consensus");
-    if (candidates.length === 0) return { approved: false, error: "No active providers available for consensus." };
-    const consensusCandidates = candidates.slice(0, 3);
-    const promises = consensusCandidates.map(async (provider) => {
-      const startTime = Date.now();
-      const model = provider.models[0];
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 12000));
-      try {
-        const res = await Promise.race([provider.client.chat.completions.create({ model, messages: [{ role: "system", content: "You are TRUNKIA." }, { role: "user", content: prompt }], max_tokens: 1024, temperature: 0.2 }), timeoutPromise]);
-        const latency = Date.now() - startTime;
-        provider.recordSuccess(latency);
-        return { success: true, provider, model, content: res.choices?.[0]?.message?.content || "", tokens: res.usage?.total_tokens, latency };
-      } catch (err) { provider.recordFailure(); return { success: false }; }
-    });
-    const results = await Promise.all(promises);
-    const successfulResults = results.filter(r => r.success);
-    if (successfulResults.length === 0) return { approved: false, error: "Consensus failed." };
-    const bestResult = successfulResults[0];
-    const dlpResult = dlpEngine.scan(bestResult.content, "consensus:" + bestResult.provider.name, userId);
-    const finalResult = { approved: true, content: dlpResult.sanitizedContent, model: bestResult.provider.name + "/" + bestResult.model, tokens: bestResult.tokens, latency_ms: bestResult.latency, consensus_achieved: successfulResults.length, dlp_incidents: dlpResult.incidents.length };
-    semanticCache.store(prompt, finalResult, userId, finalResult.tokens);
-    return finalResult;
-  }
-  async runByModelName(modelKey, prompt, systemPrompt = "", userId = "global") {
-    if (!isSafePrompt(prompt)) return SAFE_BLOCK_RESPONSE;
-    const provider = this.providers.find(p => p.isAvailable() && p.models.includes(modelKey));
-    if (!provider) return { approved: false, error: "Model not available." };
-    const startTime = Date.now();
-    try {
-      const res = await provider.client.chat.completions.create({ model: modelKey, messages: [{ role: "system", content: systemPrompt || "You are TRUNKIA." }, { role: "user", content: prompt }], max_tokens: 1024, temperature: 0.3 });
-      const latency = Date.now() - startTime;
-      provider.recordSuccess(latency);
-      const rawContent = res.choices?.[0]?.message?.content || "";
-      const dlpResult = dlpEngine.scan(rawContent, provider.name, userId);
-      return { approved: true, content: dlpResult.sanitizedContent, model: provider.name + "/" + modelKey, tokens: res.usage?.total_tokens, latency_ms: latency, dlp_incidents: dlpResult.incidents.length };
-    } catch (err) { provider.recordFailure(); return { approved: false, error: "Inference failed." }; }
-  }
-  async runGroq(prompt, systemPrompt = "", userId = "global") {
-    if (!isSafePrompt(prompt)) return SAFE_BLOCK_RESPONSE;
-    const provider = this.providers.find(p => p.name === "groq" && p.isAvailable());
-    if (!provider) return { approved: false, error: "Groq provider not available." };
-    const startTime = Date.now();
-    const model = provider.models[0];
-    try {
-      const res = await provider.client.chat.completions.create({ model, messages: [{ role: "system", content: systemPrompt || "You are TRUNKIA." }, { role: "user", content: prompt }], max_tokens: 1024, temperature: 0.3 });
-      const latency = Date.now() - startTime;
-      provider.recordSuccess(latency);
-      const rawContent = res.choices?.[0]?.message?.content || "";
-      const dlpResult = dlpEngine.scan(rawContent, provider.name, userId);
-      return { approved: true, content: dlpResult.sanitizedContent, model: provider.name + "/" + model, tokens: res.usage?.total_tokens, latency_ms: latency, dlp_incidents: dlpResult.incidents.length };
-    } catch (err) { provider.recordFailure(); return { approved: false, error: "Inference failed." }; }
   }
 
   getHealthStatus() {

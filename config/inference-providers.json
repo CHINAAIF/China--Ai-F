@@ -6,7 +6,7 @@
       "envKey": "GROQ_API_KEY",
       "priority": 1,
       "models": {
-        "lite": "gemma2-9b-it",
+        "lite": "llama-3.1-8b-instant",
         "standard": "llama-3.3-70b-versatile",
         "heavy": "llama-3.3-70b-versatile"
       }

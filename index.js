@@ -411,42 +411,59 @@ app.get('/api/self-heal/status', adminGuard, function(req, res) { res.json({ cir
 app.get('/api/self-heal/circuit/reset', adminGuard, function(req, res) { circuit.state = 'CLOSED'; circuit.failures = 0; circuit.halfOpenSuccesses = 0; res.json({ circuit: 'reset', new_state: 'CLOSED' }); });
 
 
-app.post('/api/inference/chat', async (req, res) => {
+app.post("/v1/chat/completions", async (req, res) => {
+  console.log("[TRACE] Shadow API request received...");
   try {
-    const authHeader = req.get('authorization') || '';
-    const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    const rawKey = bearerMatch ? bearerMatch[1].trim() : null;
+    const authHeader = req.get("authorization") || "";
+    const rawKey = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
     const authResult = await validateApiKeyAndQuota(rawKey);
+    if (!authResult.valid) return res.status(authResult.code || 401).json({ error: { message: authResult.message } });
 
-    if (!authResult.valid) {
-      return res.status(authResult.code || 401).json({
-        error: authResult.message || 'UNAUTHORIZED'
-      });
-    }
-    const { message, session_id } = req.body || {};
-    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
-    const { sanitized, flags, rejected } = sanitizeInput(message);
-    if (rejected) return res.status(413).json({ error: 'INPUT_REJECTED', reason: rejected.reason });
-    const promptAnalysis = analyzePromptLocally(sanitized);
-    await logCognitiveTurn(session_id, crypto.createHash('sha256').update(sanitized).digest('hex'), promptAnalysis.scores, promptAnalysis.action);
-    const riskState = await checkAndUpdateSessionRisk(session_id, promptAnalysis.scores.injection_score);
-    if (riskState.honeypot) {
-      const decoy = await engageHoneypot(session_id, 'Cumulative risk threshold');
-      if (decoy) return res.json(decoy);
-    }
-    if (promptAnalysis.action === 'block') return res.status(403).json({ error: 'PROMPT_INJECTION_BLOCKED', severity: promptAnalysis.severity });
-    const taskType = classifyTask(sanitized);
-    const contextMessages = await getContextMessages(session_id, sanitized);
+    const prompt = req.body?.messages?.slice(-1)[0]?.content || "";
+    const routingProfile = classifyTask(prompt);
+    const inputTokens = tokenMeter.countTokens(prompt);
+    
     const startTime = Date.now();
-    const promptText = Array.isArray(contextMessages) ? JSON.stringify(contextMessages) : contextMessages;
-    const sipResult = await sovereignProtocol.execute(promptText, taskType);
+    const sipResult = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
     const latency = Date.now() - startTime;
     const safeContent = sanitizeOutput(sipResult.content);
-    await saveContextMessage(session_id, 'user', sanitized);
-    await saveContextMessage(session_id, 'assistant', safeContent);
-    logInferenceAsync({ request_hash: crypto.createHash('sha256').update(sanitized).digest('hex'), task_type: taskType, model_used: inferenceResult.model_used, latency_ms: latency, tokens_in: inferenceResult.tokens_in, tokens_out: inferenceResult.tokens_out, cost_usd: (inferenceResult.tokens_in / 1000000) * 2, outcome: 'success' }).catch(() => {});
-    res.json({ success: true, content: safeContent, model: sipResult.attestation.chain[2].data.primary_model, session_id, pii_flags: flags, sovereign_attestation: sipResult.attestation });
-  } catch (err) { res.status(500).json({ error: 'INTERNAL_ERROR' }); }
+
+    const outputTokens = tokenMeter.countTokens(safeContent);
+    const actualCost = tokenMeter.calculateActualCost(inputTokens, outputTokens);
+
+    logInferenceAsync({
+      request_hash: crypto.createHash("sha256").update(prompt).digest("hex"),
+      task_type: routingProfile.tier,
+      model_used: "trunkia-shadow-1.0",
+      latency_ms: latency,
+      tokens_in: inputTokens,
+      tokens_out: outputTokens,
+      cost_usd: actualCost / 1000,
+      outcome: "success"
+    }).catch(() => {});
+
+    res.json({
+      id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: "trunkia-shadow-1.0",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: safeContent },
+          finish_reason: "stop"
+        }
+      ],
+      usage: {
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens,
+        total_tokens: actualCost
+      }
+    });
+  } catch (err) {
+    console.error("[SHADOW API] Error:", err.message);
+    res.status(500).json({ error: { message: "Internal processing error" } });
+  }
 });
 
 app.post('/api/intelligence/arxiv-scan', async (req, res) => {
