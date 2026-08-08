@@ -1,0 +1,34 @@
+# =============================================================================
+# TRUNKIA — Gitleaks Configuration
+# -----------------------------------------------------------------------------
+# Extends the default gitleaks ruleset (all built-in rules active) and adds
+# an allowlist for the historical db-backups/ directory.
+#
+# Security incident 2026-07-01:
+#   - db-backups/neon_backup_*.json was accidentally committed (36 MB dump
+#     containing 9 real API keys + connection strings)
+#   - ALL secrets were ROTATED on 2026-07-06 (~10 hours after detection)
+#   - Files removed from working tree, path added to .gitignore
+#   - This allowlist prevents CI from failing on already-remediated findings
+#     that still exist in git history (commits cannot be rewritten without
+#     disrupting all collaborators and forks).
+#
+# Risk assessment:
+#   - db-backups/ is in .gitignore → new files cannot be accidentally committed
+#   - Allowlist only affects historical files at that path
+#   - Any NEW secret at a different path will still be detected
+#
+# Review: this file must be reviewed quarterly. Remove allowlist entries
+# once git history is rewritten (if ever) or after 90 days from incident.
+# =============================================================================
+
+title = "TRUNKIA Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Historical db-backups directory — secrets rotated 2026-07-06, see docs/security-incidents.md"
+paths = [
+  '''db-backups/.*''',
+]

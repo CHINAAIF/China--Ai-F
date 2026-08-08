@@ -1,0 +1,208 @@
+# =============================================================================
+# TRUNKIA — CI/CD Pipeline (Enterprise Grade)
+# -----------------------------------------------------------------------------
+# Reference standards: SLSA Level 3, OWASP Top 10, GitHub Actions Security Best
+# Practices, principle of least privilege, supply-chain protection via SHA pinning.
+# =============================================================================
+name: CI/CD Pipeline (Enterprise Grade)
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+
+# SLSA L3: explicit least-privilege permissions (no default write tokens)
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref — saves runner minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ===========================================================================
+  # JOB 1: Static Application Security Testing (SAST)
+  # ===========================================================================
+  security-sast:
+    name: Security — Gitleaks + Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to Security tab
+      actions: read            # required for Semgrep to read workflow runs
+
+    steps:
+      - name: Checkout code (full history for Gitleaks)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          fetch-depth: 0           # CRITICAL: Gitleaks needs full git history
+          persist-credentials: false
+
+      # -------------------------------------------------------------------------
+      # Gitleaks via CLI (not the Docker action — that hides the SARIF file
+      # inside the container filesystem where subsequent steps can't read it).
+      # -------------------------------------------------------------------------
+      - name: Install Gitleaks CLI
+        run: |
+          GITLEAKS_VERSION="8.21.2"
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          sudo tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Gitleaks — Secret Detection (full history scan)
+        id: gitleaks
+        continue-on-error: true    # we want SARIF upload to happen even if leaks found
+        run: |
+          gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --report-format sarif \
+            --report-path gitleaks-results.sarif \
+            --no-banner \
+            --redact
+
+      - name: Verify Gitleaks SARIF was generated
+        if: always()
+        run: |
+          if [ -f gitleaks-results.sarif ]; then
+            echo "✓ gitleaks-results.sarif exists ($(wc -c < gitleaks-results.sarif) bytes)"
+          else
+            echo "::error::gitleaks-results.sarif was not generated"
+            exit 1
+          fi
+
+      # -------------------------------------------------------------------------
+      # Semgrep via CLI (not the Docker action — same filesystem isolation issue
+      # as gitleaks-action; also semgrep-action@v1 runs `semgrep ci` by default
+      # which requires SEMGREP_APP_TOKEN. We use `semgrep scan` for local-only
+      # mode without cloud dependency).
+      # -------------------------------------------------------------------------
+      - name: Install Semgrep CLI
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install semgrep
+          semgrep --version
+
+      - name: Semgrep — SAST (JS/Node + OWASP Top 10 + misconfig)
+        id: semgrep
+        continue-on-error: true    # we want SARIF upload to happen even if findings found
+        run: |
+          semgrep scan \
+            --config p/javascript \
+            --config p/nodejs \
+            --config p/owasp-top-ten \
+            --config p/r2c-bug-scan \
+            --config p/react-best-practices \
+            --sarif --output semgrep.sarif \
+            --no-git-ignore \
+            --error
+
+      - name: Verify Semgrep SARIF was generated
+        if: always()
+        run: |
+          if [ -f semgrep.sarif ]; then
+            echo "✓ semgrep.sarif exists ($(wc -c < semgrep.sarif) bytes)"
+          else
+            echo "::error::semgrep.sarif was not generated"
+            exit 1
+          fi
+
+      - name: Upload Semgrep SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a  # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Upload Gitleaks SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a  # v4
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks
+
+      # Final gates: fail the job if either tool found issues (after SARIF upload)
+      - name: Fail job if Gitleaks found leaks
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          echo "::error::Gitleaks found secrets in the repository — see Security tab for details"
+          exit 1
+
+      - name: Fail job if Semgrep found findings
+        if: steps.semgrep.outcome == 'failure'
+        run: |
+          echo "::error::Semgrep found security findings — see Security tab for details"
+          exit 1
+
+  # ===========================================================================
+  # JOB 2: Tests + Dependency Audit
+  # ===========================================================================
+  test-and-audit:
+    name: Tests — Vitest + npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    needs: security-sast           # Do not run tests if SAST fails
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (deterministic, no audit inline)
+        run: npm ci --no-audit --no-fund
+
+      - name: Dependency Audit — fail on high or critical
+        run: npm audit --audit-level=high --omit=dev
+        continue-on-error: false
+
+      - name: Run Integration & Unit Tests (Vitest)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_GOVERNANCE: ${{ secrets.DATABASE_URL_GOVERNANCE }}
+          DATABASE_URL_SECURITY: ${{ secrets.DATABASE_URL_SECURITY }}
+          DATABASE_URL_LEARNING: ${{ secrets.DATABASE_URL_LEARNING }}
+          DATABASE_URL_INTELLIGENCE: ${{ secrets.DATABASE_URL_INTELLIGENCE }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          GOVERNANCE_HMAC_SECRET: ${{ secrets.GOVERNANCE_HMAC_SECRET }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TRUNKIA_API_KEY: ${{ secrets.TRUNKIA_API_KEY }}
+          NODE_ENV: test
+        run: npm test -- --coverage
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: test-results
+          path: |
+            test-results.json
+            test-results.junit.xml
+            coverage/
+          retention-days: 14
+          if-no-files-found: warn

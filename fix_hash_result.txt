@@ -1,0 +1,63 @@
+(node:24344) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✅ cleaned test data
+
+🔧 fixing 12 bad hashes...
+  fixed: 0 | failed: 12
+
+✅ remaining bad hashes: 12
+
+📋 last 5 event_log hashes:
+  execution_blocked | computing...
+  execution_complete | computing...
+  execution_start | computing...
+  execution_blocked | computing...
+  execution_complete | computing...
+
+--- اختبار 1: عقد غير موجود ---
+[execution-layer] hash verify failed for fe06beb2-da8c-4997-9cb8-f030a7ede8a1
+success: false | error: missing_contract_fields
+
+--- اختبار 2: عقد منتهي الصلاحية ---
+[execution-layer] hash verify failed for e99c274e-6b38-47ba-bcb7-5eaaf65f6830
+success: false | error: contract_expired
+
+--- اختبار 3: عقد صالح + تنفيذ فعلي ---
+[execution-layer] hash verify failed for a762ce57-8af2-4bda-8849-38567d6e1b5d
+[execution-layer] routing_decisions error: invalid input syntax for type uuid: "groq"
+[execution-layer] hash verify failed for 5586f543-0dc9-4cbd-a7f5-e9cef4433873
+success: true
+confidence: 92 | latency: 3165ms
+tokens: 0/0 | cost: $0
+pii_masked: true | byok: false
+
+--- اختبار 4: رفض إعادة التشغيل ---
+[execution-layer] hash verify failed for 8a908064-f383-4a3d-8a6b-434f437fadbf
+success: false | error: contract_already_used
+
+--- اختبار 5: حجب PII ---
+[execution-layer] hash verify failed for 3991e0f2-1fca-48b5-8897-81796addd4db
+[execution-layer] routing_decisions error: invalid input syntax for type uuid: "groq"
+[execution-layer] hash verify failed for a4a462de-9e3f-4190-893c-e680f544e682
+success: true
+
+✅ آخر 3 routing_decisions:
+  تشخيص عام | light | conf:75 | advised | 4801ms
+  استعلام عن تكلفة دفع الفاتورة | heavy | conf:85 | advised | 23192ms
+  مقارنة بين نموذج GPT-4 ونموذج Claude من حيث القدرات، الأداء، والتكلفة | standard | conf:85 | advised | 7743ms
+
+✅ آخر 5 event_log hashes:
+  execution_complete | computing...
+  execution_start | computing...
+  execution_blocked | computing...
+  execution_complete | computing...
+  execution_start | computing...
+
+🏁 اكتمل

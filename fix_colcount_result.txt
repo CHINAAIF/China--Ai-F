@@ -1,0 +1,38 @@
+Fixing execution-layer.js...
+  Fixed SQL column count: $5,$6,NOW()
+  Fixed request_hash fallback
+
+Verify:
+  has $6,NOW(): true
+  has request_hash fallback: true
+
+Testing...
+(node:6569) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[execution-layer] routing_decisions error: null value in column "request_hash" of relation "routing_decisions" violates not-null constraint
+  success: true
+  confidence: 95 | latency: 5477ms
+  tokens: 0/0
+  replay blocked: true
+  expired blocked: true
+
+DB verify:
+  execution_blocked | b528989b192ab4310105b519 OK
+  execution_blocked | e83b0b191475fd4c1ad13960 OK
+  execution_complete | 5ef31ff6f40c0de0f270931d OK
+  execution_start | e74aa6888b408ed7bf19b16d OK
+  execution_blocked | computing OK
+  execution_complete | computing OK
+  new entries: 6 good, 0 bad
+  rd: تشخيص عام | conf:75 | advised | 4801ms
+  rd: استعلام عن تكلفة دفع الفاتورة | conf:85 | advised | 23192ms
+  total bad hashes in DB: 25 (old entries, cannot UPDATE due to rule)
+
+Done

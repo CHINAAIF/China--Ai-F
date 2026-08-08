@@ -1,0 +1,46 @@
+🔍 تهيئة advisor-layer...
+(node:8984) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+initialize: true | status: active
+
+--- اختبار 1: طلب intelligence عادي ---
+[advisor-layer] event_log error: hash_update_failed
+success: true
+intent: مقارنة بين نموذج GPT-4 ونموذج Claude من حيث القدرات، الأداء، والتكلفة
+confidence: 85
+contract_id: 99a852f1-f9d8-42b3-82d6-039101b66ef0
+latency_ms: 8333
+
+--- اختبار 2: طلب financial ---
+[advisor-layer] event_log error: hash_update_failed
+success: true
+intent: استعلام عن تكلفة دفع الفاتورة
+escalation_tier: 4
+
+--- اختبار 3: محاولة SQL injection ---
+[advisor-layer] event_log error: hash_update_failed
+blocked: true
+success: false
+
+--- اختبار 4: diagnostic ---
+[advisor-layer] event_log error: hash_update_failed
+diagnostic status: ok
+
+✅ تحقق DB — آخر 3 عقود:
+  id:937b5ee2-f14e-4190-aa91-28535e76fff5 | used:false | hash:805f1888b947f7d7... | valid_until:Mon Jun 22 2026 15:16:35 GMT+0300 (Eastern European Summer Time)
+  id:06931a20-49d8-4e32-af26-68c1a2510ac4 | used:false | hash:c46430976220b942... | valid_until:Mon Jun 22 2026 15:16:29 GMT+0300 (Eastern European Summer Time)
+  id:99a852f1-f9d8-42b3-82d6-039101b66ef0 | used:false | hash:ded726f354bf5a3a... | valid_until:Mon Jun 22 2026 15:16:05 GMT+0300 (Eastern European Summer Time)
+
+✅ تحقق DB — آخر 3 event_log:
+  type:advisor_decision | hash:pending...
+  type:security_threat_blocked | hash:pending...
+  type:advisor_decision | hash:pending...
+
+🏁 الاختبار اكتمل

@@ -1,0 +1,67 @@
+=== Safety & Compliance Layer Tests ===
+
+--- Init ---
+(node:30105) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+initialize: true | status: active
+
+--- Test 1: Clean text (low risk) ---
+  allowed: true | blocked: false
+  privacy risk: low | pii: 0
+
+--- Test 2: Email PII (medium risk) ---
+  allowed: true | blocked: false
+  privacy risk: medium | pii: 2
+  masked: أرسل تقريراً لـ user@company.com و admin@secret.org
+  gdpr passed: true
+
+--- Test 3: Credit card + national ID (critical — should block) ---
+  allowed: false | blocked: true
+  privacy risk: medium | pii: 3
+  masked: بطاقتي 4532-1234-5678-9012 ورقم هويتي SA1234567890
+
+--- Test 4: Government classified (critical) ---
+  allowed: false | blocked: true
+  privacy risk: medium
+  gdpr passed: false
+  gdpr violations: [{"rule":"gdpr_data_protection","severity":"critical","detail":"Blocked-level PII detected in input"},{"rule":"gdpr_cross_border","severity":"high","detail":"Government-classified data detected"}]
+
+--- Test 5: Stats ---
+  total_checks: 2 | failed: 0
+  critical_privacy: 0 | incidents: 0
+  risk_distribution: [{"overall_privacy_risk":"medium","c":"3"},{"overall_privacy_risk":"low","c":"1"}]
+
+--- Test 6: Diagnostic ---
+  {
+  "agent": "safety_compliance_layer",
+  "status": "ok",
+  "stats": {
+    "total_checks": "2",
+    "failed_checks": "0",
+    "total_privacy_scores": "4",
+    "critical_privacy": "0",
+    "total_incidents": "0",
+    "open_incidents": "0",
+    "risk_distribution": [
+      {
+        "overall_privacy_risk": "medium",
+        "c": "3"
+      },
+      {
+        "overall_privacy_risk": "low",
+        "c": "1"
+      }
+    ]
+  },
+  "rules_cached": 10,
+  "timestamp": "2026-06-22T15:07:29.772Z"
+}
+
+Done

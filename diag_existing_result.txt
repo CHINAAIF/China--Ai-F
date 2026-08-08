@@ -1,0 +1,248 @@
+(node:15330) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+=== event_log columns ===
+  id | uuid | nullable:NO
+  event_type | character varying | nullable:NO
+  agent_id | character varying | nullable:YES
+  customer_id | uuid | nullable:YES
+  policy_version_id | uuid | nullable:YES
+  payload | jsonb | nullable:NO
+  payload_hash | character varying | nullable:NO
+  signature | character varying | nullable:YES
+  created_at | timestamp with time zone | nullable:NO
+
+=== entries with bad hash ===
+
+=== agents/governance/ ===
+  advisor-layer.js
+  agent-supervisor.js
+  audit-gateway-v2.js
+  crisis_agent.js
+  emergency_agent.js
+  governor.js
+  key-sentinel.js
+  master_orchestrator.js
+  multi-model.js
+  policy-enforcer.js
+  quality_auditor.js
+  replay-guard.js
+  scheduler_agent.js
+  tactical-routing-agent.js
+  tactical-routing.js
+  task_distributor.js
+  verification-agent.js
+
+=== agents/sovereign/ ===
+  diagnostic-agent.js
+  executive-agent.js
+  quality-gate-agent.js
+  sovereign-mind.js
+
+=== agents/intelligence/ ===
+  benchmark_runner_agent.js
+  brain-acquisition-agent.js
+  china-news-agent.js
+  china-social.js
+  china_company_agent.js
+  china_investment_agent.js
+  china_media_agent.js
+  china_patent_agent.js
+  china_policy_agent.js
+  china_research_agent.js
+  china_sanctions_agent.js
+  chinese_model_tracker.js
+  competitor_monitor_agent.js
+  eu_models_agent.js
+  global_comparison_agent.js
+  global_models_agent.js
+  global_price_gap_agent.js
+  pricing-tracker-agent.js
+  pricing_oracle_agent.js
+  supply_chain_agent.js
+  us_models_agent.js
+
+=== agents/learning/ ===
+  approval_agent.js
+  epistemic-firewall-agent.js
+  filter_agent.js
+  ground-truth-validator.js
+  knowledge-distillation-agent.js
+  learning_agent.js
+  memory-promotion-engine.js
+  verification_agent.js
+
+=== agents/utils/ ===
+  alert-engine.js
+  data-retention.js
+  db.js
+  executor.js
+  gateway-sentinel.js
+  heartbeat.js
+  judicial-router.js
+  knowledge-distiller.js
+  performance-scorer.js
+  rate-limiter.js
+  redundancy-manager.js
+  safe-json.js
+  self-healer.js
+  semantic-firewall.js
+  startup-coordinator.js
+
+=== routes/ ===
+  health.js
+  metrics.js
+  middleware.js
+  sovereign.js
+
+=== ALL TABLES ===
+  accounts
+  adversarial_claims
+  agent_circuit_breaker
+  agent_dead_letter
+  agent_dependencies
+  agent_errors
+  agent_execution_logs
+  agent_heartbeat
+  agent_performance_scores
+  agent_redundancy_map
+  agent_registry
+  agent_supervision
+  agent_task_queue
+  ai_agent_logs
+  ai_permissions
+  api_key_usage_logs
+  api_keys
+  article_revisions
+  articles
+  audit_logs
+  ba_accounts
+  ba_sessions
+  ba_users
+  ba_verifications
+  benchmark_comparisons
+  benchmark_definitions
+  billing_events
+  brain_filtered_memory
+  brain_hard_memory
+  brain_knowledge_gaps
+  brain_long_memory
+  brain_memory
+  brain_sovereign_memory
+  brain_working_memory
+  byok_keys
+  certificates
+  chinese_ai_models
+  circuit_breaker_log
+  comment_reports
+  comment_votes
+  comments
+  consultation_requests
+  contact_messages
+  content_translation_groups
+  cost_tracking
+  courses
+  cron_jobs
+  customer_schemas
+  diagnostic_repairs
+  divergence_log
+  email_verifications
+  enrollments
+  entities
+  entity_relationships
+  event_log
+  events
+  evidence_chain
+  executive_commands
+  feature_flags
+  governance_contracts
+  governance_decisions
+  inference_providers
+  intelligence_raw
+  intelligence_sources
+  intelligence_verified
+  judicial_routing_log
+  knowledge_conflicts
+  knowledge_distillation
+  learning_approved
+  learning_candidates
+  learning_rejected
+  lesson_attachments
+  lesson_progress
+  lessons
+  locales
+  login_attempts
+  media_assets
+  media_usage
+  model_accuracy_registry
+  model_benchmarks
+  model_capabilities
+  model_changelog
+  model_consensus
+  model_follows
+  model_geopolitical_risk
+  model_pricing_tiers
+  model_registry_sovereign
+  model_reviews
+  model_timeline
+  model_view_stats
+  models
+  moderation_queue
+  nonce_registry
+  notification_preferences
+  notification_templates
+  notifications
+  page_views
+  password_resets
+  platform_knowledge_base
+  playing_with_neon
+  policy_cache_state
+  policy_conflicts_log
+  policy_documents
+  prediction_registry
+  pricing_alerts
+  pricing_history
+  prompt_categories
+  prompt_ratings
+  prompt_saves
+  prompts
+  provenance_log
+  quality_gate_log
+  quiz_attempts
+  quizzes
+  rate_limit_buckets
+  rate_limit_rules
+  referral_codes
+  referral_events
+  routing_decisions
+  search_queries
+  security_filter_log
+  sessions
+  source_reputation
+  sovereign_memory_local
+  sovereign_operations
+  subscription_plans
+  system_health
+  system_settings
+  taggables
+  tags
+  temporal_intelligence
+  tool_favorites
+  tool_runs
+  tools
+  user_activity_summary
+  user_preferences
+  user_profiles
+  user_subscriptions
+  users
+  vendor_contacts
+  vendor_partnerships
+  vendors
+  waitlist
+  webhook_queue

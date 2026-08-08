@@ -1,0 +1,18 @@
+🔍 تهيئة execution-layer...
+(node:20094) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+initialize: true | status: active
+
+--- اختبار 1: عقد غير موجود ---
+[execution-layer] hash verify failed for 7a64deda-6ba1-4e49-af5d-d80ee2a31809
+success: false | error: missing_contract_fields
+
+--- اختبار 2: عقد منتهي الصلاحية ---
+FATAL: duplicate key value violates unique constraint "governance_contracts_nonce_key"

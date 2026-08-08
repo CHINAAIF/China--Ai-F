@@ -1,0 +1,5 @@
+# تجاهل السكريبتات المساعدة التي لا تعمل في الإنتاج
+scripts/
+security-scanner/
+test-pipeline.js
+node_modules/

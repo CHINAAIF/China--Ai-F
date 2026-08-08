@@ -1,0 +1,20 @@
+(node:15743) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+=== event_log last 5 ===
+  advisor_decision | hash:pending | {"decision": {"risk": "low", "intent": "تشخيص عام", "confide
+  security_threat_blocked | hash:pending | {"risk": "critical", "reason": "threat_pattern_detected"}
+  advisor_decision | hash:pending | {"decision": {"risk": "high", "intent": "استعلام عن تكلفة دف
+  advisor_decision | hash:pending | {"decision": {"risk": "low", "intent": "مقارنة بين نموذج GPT
+  replay_attempt | hash:6cd0aaf8cfbfd99e62a4047ffd4b52a281e20cc86149ab153165bddd1397516e | {"used_at": "2026-06-22T10:33:30.849Z", "contract_id": "1ade
+  table compliance_checks: MISSING
+  table privacy_scores: MISSING
+  table incident_reports: MISSING
+  table data_sensitivity_rules: MISSING
+DIAG ERROR: ENOENT: no such file or directory, open '/root/downloads/China--Ai-F/agents/utils/safe-json.js'
