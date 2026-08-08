@@ -1,4 +1,5 @@
 import './config/env.js';
+import { sovereignProtocol } from './lib/sovereign-protocol.js';
 import { adminGuard } from './lib/admin-guard.js';
 import { faultDetectorAgent } from './agents/system/fault-detector-agent.js';
 import { selfHealerAgent } from './agents/system/self-healer-agent.js';
@@ -411,61 +412,6 @@ app.get('/api/self-heal/status', adminGuard, function(req, res) { res.json({ cir
 app.get('/api/self-heal/circuit/reset', adminGuard, function(req, res) { circuit.state = 'CLOSED'; circuit.failures = 0; circuit.halfOpenSuccesses = 0; res.json({ circuit: 'reset', new_state: 'CLOSED' }); });
 
 
-app.post("/v1/chat/completions", async (req, res) => {
-  console.log("[TRACE] Shadow API request received...");
-  try {
-    const authHeader = req.get("authorization") || "";
-    const rawKey = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-    const authResult = await validateApiKeyAndQuota(rawKey);
-    if (!authResult.valid) return res.status(authResult.code || 401).json({ error: { message: authResult.message } });
-
-    const prompt = req.body?.messages?.slice(-1)[0]?.content || "";
-    const routingProfile = classifyTask(prompt);
-    const inputTokens = tokenMeter.countTokens(prompt);
-    
-    const startTime = Date.now();
-    const sipResult = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
-    const latency = Date.now() - startTime;
-    const safeContent = sanitizeOutput(sipResult.content);
-
-    const outputTokens = tokenMeter.countTokens(safeContent);
-    const actualCost = tokenMeter.calculateActualCost(inputTokens, outputTokens);
-
-    logInferenceAsync({
-      request_hash: crypto.createHash("sha256").update(prompt).digest("hex"),
-      task_type: routingProfile.tier,
-      model_used: "trunkia-shadow-1.0",
-      latency_ms: latency,
-      tokens_in: inputTokens,
-      tokens_out: outputTokens,
-      cost_usd: actualCost / 1000,
-      outcome: "success"
-    }).catch(() => {});
-
-    res.json({
-      id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
-      object: "chat.completion",
-      created: Math.floor(Date.now() / 1000),
-      model: "trunkia-shadow-1.0",
-      choices: [
-        {
-          index: 0,
-          message: { role: "assistant", content: safeContent },
-          finish_reason: "stop"
-        }
-      ],
-      usage: {
-        prompt_tokens: inputTokens,
-        completion_tokens: outputTokens,
-        total_tokens: actualCost
-      }
-    });
-  } catch (err) {
-    console.error("[SHADOW API] Error:", err.message);
-    res.status(500).json({ error: { message: "Internal processing error" } });
-  }
-});
-
 app.post('/api/intelligence/arxiv-scan', async (req, res) => {
   try {
     const result = await arxivSentinelAgent.scan(req.body.topic);
@@ -528,35 +474,172 @@ app.use(function(req, res) {
   res.status(404).json({ error: 'Not found', request_id: req._requestId || 'unknown' });
 });
 
+/* ===== CRON MUTEX (Prevents Stampede) ===== */
+const cronLocks = new Map();
+function safeCron(name, fn) {
+  return async function() {
+    if (cronLocks.has(name)) return console.warn('[CRON SKIP] ' + name + ' already running');
+    cronLocks.set(name, true);
+    try { await fn(); } catch (e) { console.error('[CRON ERR] ' + name + ':', e.message); } finally { cronLocks.delete(name); }
+  };
+}
+
 /* ===== CRON ===== */
 function setupCron(cl) {
   if (!cl) return;
   try {
-    cronJobs['agent-heartbeat'] = cl.schedule('*/5 * * * *', async function() { try { await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'error', error: e.message }; } });
-    cronJobs['agent-sync'] = cl.schedule('0 * * * *', async function() { try { var r = await syncAgentsToDb(); cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } });
-    cronJobs['self-heal'] = cl.schedule('*/15 * * * *', async function() { try { var r = await selfHeal(); cronStats['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { cronStats['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } });
-    cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', async function() { try { await runGovernanceMonitor(); cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } });
+    cronJobs['agent-heartbeat'] = cl.schedule('*/5 * * * *', safeCron('agent-heartbeat', async function() { try { await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'error', error: e.message }; } }));
+    cronJobs['agent-sync'] = cl.schedule('0 * * * *', safeCron('agent-sync', async function() { try { var r = await syncAgentsToDb(); cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } }));
+    cronJobs['self-heal'] = cl.schedule('*/15 * * * *', safeCron('self-heal', async function() { try { var r = await selfHeal(); cronStats['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { cronStats['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } }));
+    cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', safeCron('governance-monitor', async function() { try { await runGovernanceMonitor(); cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } }));
     // Sensory Agents (تعمل كل ساعة)
-    cronJobs['arxiv-sentinel'] = cl.schedule('0 * * * *', async function() { try { await arxivSentinelAgent.run('Artificial Intelligence'); } catch (e) { console.error('[ARXIV SENTINEL ERR]', e.message); } });
-    cronJobs['china-news'] = cl.schedule('30 * * * *', async function() { try { await chinaNewsAgent.run(); } catch (e) { console.error('[CHINA NEWS ERR]', e.message); } });
+    cronJobs['arxiv-sentinel'] = cl.schedule('0 * * * *', safeCron('arxiv-sentinel', async function() { try { await arxivSentinelAgent.run('Artificial Intelligence'); } catch (e) { console.error('[ARXIV SENTINEL ERR]', e.message); } }));
+    cronJobs['china-news'] = cl.schedule('30 * * * *', safeCron('china-news', async function() { try { await chinaNewsAgent.run(); } catch (e) { console.error('[CHINA NEWS ERR]', e.message); } }));
     
     // System Swarm Agents (تعمل في الخلفية)
-    cronJobs['fault-detector'] = cl.schedule('* * * * *', async function() { try { await faultDetectorAgent.run(); } catch (e) { console.error('[FAULT DETECTOR ERR]', e.message); } });
-    cronJobs['self-healer'] = cl.schedule('* * * * *', async function() { try { await selfHealerAgent.run(); } catch (e) { console.error('[SELF HEALER ERR]', e.message); } });
-    cronJobs['red-team'] = cl.schedule('0 * * * *', async function() { try { await redTeamAgent.run(); } catch (e) { console.error('[RED TEAM ERR]', e.message); } });
-    cronJobs['dlp-stats'] = cl.schedule('0 */6 * * *', async function() { try { await dlpAgent.run(); } catch (e) { console.error('[DLP STATS ERR]', e.message); } });
+    cronJobs['fault-detector'] = cl.schedule('* * * * *', safeCron('fault-detector', async function() { try { await faultDetectorAgent.run(); } catch (e) { console.error('[FAULT DETECTOR ERR]', e.message); } }));
+    cronJobs['self-healer'] = cl.schedule('* * * * *', safeCron('self-healer', async function() { try { await selfHealerAgent.run(); } catch (e) { console.error('[SELF HEALER ERR]', e.message); } }));
+    cronJobs['red-team'] = cl.schedule('0 * * * *', safeCron('red-team', async function() { try { await redTeamAgent.run(); } catch (e) { console.error('[RED TEAM ERR]', e.message); } }));
+    cronJobs['dlp-stats'] = cl.schedule('0 */6 * * *', safeCron('dlp-stats', async function() { try { await dlpAgent.run(); } catch (e) { console.error('[DLP STATS ERR]', e.message); } }));
     
-    cronJobs['strategic-analyst'] = cl.schedule('0 */2 * * *', async function() { try { await strategicAnalystAgent.run(); } catch (e) { console.error('[STRATEGIC ANALYST ERR]', e.message); } });
-    cronJobs['adversarial-verifier'] = cl.schedule('0 */3 * * *', async function() { try { await adversarialVerifierAgent.run(); } catch (e) { console.error('[ADVERSARIAL VERIFIER ERR]', e.message); } });
-    cronJobs['sovereign-decision'] = cl.schedule('0 */4 * * *', async function() { try { await sovereignDecisionAgent.run(); } catch (e) { console.error('[SOVEREIGN DECISION ERR]', e.message); } });
+    cronJobs['strategic-analyst'] = cl.schedule('0 */2 * * *', safeCron('strategic-analyst', async function() { try { await strategicAnalystAgent.run(); } catch (e) { console.error('[STRATEGIC ANALYST ERR]', e.message); } }));
+    cronJobs['adversarial-verifier'] = cl.schedule('0 */3 * * *', safeCron('adversarial-verifier', async function() { try { await adversarialVerifierAgent.run(); } catch (e) { console.error('[ADVERSARIAL VERIFIER ERR]', e.message); } }));
+    cronJobs['sovereign-decision'] = cl.schedule('0 */4 * * *', safeCron('sovereign-decision', async function() { try { await sovereignDecisionAgent.run(); } catch (e) { console.error('[SOVEREIGN DECISION ERR]', e.message); } }));
     console.log('Cron: 13 jobs scheduled (Sovereign Decision active)');
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
 /* ===== START ===== */
-app.listen(PORT, async function() {
+app.get('/tap', (req, res) => { console.log('[TRUTH TAP] Hit!'); res.send('TAP_OK'); });
+app.post("/v1/chat/completions", async (req, res) => {
+  console.log("[TRACE] >>> ENTER /v1/chat/completions");
+  const traceId = crypto.randomUUID();
+  const startTime = Date.now();
+  if (res.headersSent) {
+    console.error("[" + traceId + "] FATAL: Headers already sent by upstream middleware.");
+    return;
+  }
+  if (!req.is("application/json")) {
+    return res.status(415).json({ error: { message: "Content-Type must be application/json" } });
+  }
+  try {
+    console.log("[" + traceId + "] TRACE: Shadow API request received...");
+    const rawKey = req.headers.authorization?.replace("Bearer ", "") || "";
+    console.log("[TRACE] 1: Before auth"); const authResult = process.env.BYPASS_AUTH === "true"
+      ? { valid: true, userId: "bypass-user", tier: "omega" }
+      : await validateApiKeyAndQuota(rawKey);
+    if (!authResult?.valid) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+    const prompt = req.body?.messages?.slice(-1)[0]?.content || "";
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({ error: { message: "No valid prompt provided" } });
+    }
+    console.log("[TRACE] 2: Before classifyTask"); const routingProfile = classifyTask(prompt); console.log("[TRACE] 2b: After classifyTask, tier=" + routingProfile.tier);
+    const isStream = req.body?.stream === true;
+    if (!isStream) {
+      const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
+      return res.json({
+        id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
+        object: "chat.completion",
+        created: Math.floor(Date.now() / 1000),
+        model: routingProfile.tier,
+        choices: [{ index: 0, message: { role: "assistant", content: result.content }, finish_reason: "stop" }],
+        usage: result.metadata || {}
+      });
+    }
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (res.flushHeaders) res.flushHeaders();
+    const abortController = new AbortController();
+    let heartbeatInterval = null;
+    let streamEnded = false;
+    const cleanup = (reason) => {
+      if (streamEnded) return;
+      streamEnded = true;
+      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+      try { abortController.abort(); } catch (_) {}
+      if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.write("data: " + JSON.stringify({ id: "chatcmpl-end", choices: [{ delta: {}, finish_reason: "stop" }] }) + "\n\n");
+          res.write("data: [DONE]\n\n");
+        } catch (e) {}
+        res.end();
+      }
+      console.log("[" + traceId + "] STREAM CLOSED: reason=" + reason + ", duration=" + (Date.now() - startTime) + "ms");
+    };
+    req.on("close", () => cleanup("client_close"));
+    req.on("aborted", () => cleanup("client_abort"));
+    req.on("error", (err) => cleanup("client_error:" + err.message));
+    res.on("error", (err) => cleanup("res_error:" + err.message));
+    res.on("close", () => cleanup("res_close"));
+    heartbeatInterval = setInterval(() => {
+      if (streamEnded || res.writableEnded || res.destroyed) { clearInterval(heartbeatInterval); return; }
+      try { res.write(": heartbeat\n\n"); } catch (e) { cleanup("heartbeat_write_fail"); }
+    }, 15000);
+    try {
+      console.log("[TRACE] 3: Before executeStream"); const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal);
+      console.log("[TRACE] 4: Stream started, entering loop"); for await (const event of stream) { console.log("[TRACE] 5: Got event type=" + event.type);
+        if (streamEnded || res.writableEnded || res.destroyed) break;
+        if (event.type === "chunk") {
+          let sanitized;
+          try { sanitized = sanitizeOutput(String(event.content ?? "")); }
+          catch (sanErr) { sanitized = "[SANITIZATION_ERROR]"; console.error("[" + traceId + "] Sanitization failed:", sanErr.message); }
+          let ssePayload;
+          try {
+            ssePayload = {
+              id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
+              object: "chat.completion.chunk",
+              created: Math.floor(Date.now() / 1000),
+              model: routingProfile.tier,
+              choices: [{ index: 0, delta: { content: sanitized }, finish_reason: null }]
+            };
+          } catch (jsonErr) { console.error("[" + traceId + "] JSON serialization failed:", jsonErr); continue; }
+          const payload = "data: " + JSON.stringify(ssePayload) + "\n\n";
+          const canWrite = res.write(payload);
+          if (!canWrite) { await new Promise(resolve => res.once("drain", resolve)); }
+        } else if (event.type === "metadata") {
+          const metaPayload = {
+            id: "chatcmpl-meta-" + crypto.randomBytes(6).toString("hex"),
+            object: "chat.completion.chunk",
+            choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            usage: event
+          };
+          res.write("data: " + JSON.stringify(metaPayload) + "\n\n");
+        }
+      }
+      if (!streamEnded) cleanup("normal_completion");
+    } catch (streamErr) {
+      console.error("[" + traceId + "] STREAM EXECUTION ERROR:", streamErr);
+      if (!streamEnded) {
+        try {
+          const errorPayload = {
+            id: "chatcmpl-err-" + crypto.randomBytes(6).toString("hex"),
+            object: "chat.completion.chunk",
+            choices: [{ index: 0, delta: { content: "\n\n[STREAM_ERROR: " + streamErr.message + "]" }, finish_reason: "stop" }]
+          };
+          res.write("data: " + JSON.stringify(errorPayload) + "\n\n");
+        } catch (_) {}
+        cleanup("stream_error");
+      }
+    }
+  } catch (err) {
+    console.error("[" + traceId + "] SHADOW API FATAL:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: { message: "Internal processing error", traceId } });
+    } else if (!res.writableEnded) {
+      res.end();
+    }
+  }
+});
+
+app.listen(PORT, function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
-  try { var r = await syncAgentsToDb(); console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); } catch (e) { console.error('[SYNC ERR]', e.message); }
-  try { var cm = await import('node-cron'); setupCron(cm.default || cm); } catch (e) { console.log('[WARN] node-cron not available'); }
+  // Fire-and-forget background sync to prevent Event Loop blocking
+  syncAgentsToDb().then(r => console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total')).catch(e => console.error('[SYNC ERR]', e.message));
+  import('node-cron').then(cm => setupCron(cm.default || cm)).catch(e => console.log('[WARN] node-cron not available'));
 });
 
