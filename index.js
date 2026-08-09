@@ -46,6 +46,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
+import { rateLimitMiddleware, getRateLimiterStatus, setRateLimiterPool, destroyRateLimiter } from './lib/services/sovereign-rate-limiter.js';
 dotenv.config();
 
 var app = express();
@@ -140,6 +141,7 @@ app.use('/api/scheduler/trigger/', strictLimiter);
 
 /* ===== SECURITY: Body Size ===== */
 app.use(express.json({ limit: '100kb' }));
+app.use(rateLimitMiddleware());
 app.use(scraperGuard);
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
@@ -529,6 +531,10 @@ app.post("/v1/chat/completions", async (req, res) => {
       res.end();
     }
   }
+});
+
+app.get('/api/sovereign/rate-limiter/status', function(req, res) {
+  res.json(getRateLimiterStatus());
 });
 
 app.use(function(req, res, next) {
