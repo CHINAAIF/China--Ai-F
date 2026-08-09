@@ -382,11 +382,10 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     const routingProfile = classifyTask(prompt);
     const isStream = req.body?.stream === true;
-    
-    // === QUOTA CONTEXT INITIALIZATION ===
+
     const quotaCtx = createQuotaContext(authResult.userId, traceId);
     if (process.env.BYPASS_AUTH !== "true") {
-      const quotaOk = await quotaCtx.hold(50); // Initial hold 50 tokens
+      const quotaOk = await quotaCtx.hold(50);
       if (!quotaOk) return res.status(429).json({ error: { message: "Insufficient quota" } });
     }
 
@@ -400,7 +399,6 @@ app.post("/v1/chat/completions", async (req, res) => {
           created: Math.floor(Date.now() / 1000),
           model: routingProfile.tier,
           choices: [{ index: 0, message: { role: "assistant", content: safeContent }, finish_reason: "stop" }],
-          usage: { prompt_tokens: result.attestation?.grounding?.claims || 0, completion_tokens: result.attestation?.grounding?.confidence || 0 },
           attestation: result.attestation || {}
         });
       } catch (execErr) { return res.status(500).json({ error: { message: "Processing failed" } }); }
@@ -414,7 +412,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     if (res.flushHeaders) res.flushHeaders();
 
     const abortController = new AbortController();
-    let heartbeatInterval = null, timeoutId = null, streamEnded = false, tribunalData = null;
+    let heartbeatInterval = null, timeoutId = null, streamEnded = false, tribunalData = null, contentFilterTriggered = false, signature = null;
 
     async function cleanup(reason) {
       if (streamEnded) return; streamEnded = true;
@@ -423,8 +421,10 @@ app.post("/v1/chat/completions", async (req, res) => {
       try { abortController.abort(); } catch (_) {}
       if (!res.writableEnded && !res.destroyed) {
         try {
-          if (tribunalData) {
-            res.write("data: " + JSON.stringify({ id: "chatcmpl-meta", object: "chat.completion.chunk", choices: [{ delta: {}, finish_reason: "stop" }], tribunal: tribunalData }) + "\n\n");
+          if (contentFilterTriggered) {
+            res.write("data: " + JSON.stringify({ id: "chatcmpl-filter", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "content_filter" }] }) + "\n\n");
+          } else if (tribunalData) {
+            res.write("data: " + JSON.stringify({ id: "chatcmpl-meta", object: "chat.completion.chunk", choices: [{ delta: {}, finish_reason: "stop" }], tribunal: tribunalData, signature: signature }) + "\n\n");
           }
           res.write("data: [DONE]\n\n");
         } catch (_) {}
@@ -453,8 +453,12 @@ app.post("/v1/chat/completions", async (req, res) => {
           if (!canWrite && !streamEnded) { await new Promise(resolve => res.once("drain", resolve)); }
         } else if (event.type === "metadata") {
           if (event.tribunal) tribunalData = event.tribunal;
+          if (event.contentFilterTriggered) contentFilterTriggered = true;
+          if (event.signature) signature = event.signature;
         } else if (event.type === "error") {
           if (event.metadata?.tribunal) tribunalData = event.metadata.tribunal;
+          if (event.metadata?.contentFilterTriggered) contentFilterTriggered = true;
+          if (event.metadata?.signature) signature = event.metadata.signature;
           try { res.write("data: " + JSON.stringify({ error: { message: "Stream processing error" } }) + "\n\n"); } catch (_) {}
         }
       }
