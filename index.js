@@ -392,7 +392,7 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     if (!isStream) {
       try {
-        const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
+        const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId, quotaCtx);
         const safeContent = sanitizeOutput(result.content || "");
         return res.json({
           id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
@@ -448,7 +448,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     }, 15000);
 
     try {
-      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal);
+      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal, quotaCtx);
       for await (const event of stream) {
         if (streamEnded || res.writableEnded || res.destroyed) break;
         if (event.type === "chunk") {
