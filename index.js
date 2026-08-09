@@ -47,6 +47,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
 import { rateLimitMiddleware, getRateLimiterStatus, setRateLimiterPool, destroyRateLimiter } from './lib/services/sovereign-rate-limiter.js';
+import { sovereignCommandCenter } from './lib/services/sovereign-command-center.js';
 dotenv.config();
 
 var app = express();
@@ -358,7 +359,6 @@ app.post("/v1/chat/completions", async (req, res) => {
   const traceId = crypto.randomUUID();
   const startTime = Date.now();
 
-  // --- 1. Input Validation ---
   if (!req.is("application/json")) {
     return res.status(415).json({ error: { message: "Unsupported Media Type" } });
   }
@@ -371,13 +371,35 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
 
   try {
-    // --- 2. Authentication (Bypassed Locally) ---
-    const authResult = { valid: true, userId: "bypass-user", tier: "omega" };
+    let authResult;
+    try {
+      const rawKey = req.headers.authorization?.replace(/^Bearer\s+/i, "") || "";
+      authResult = process.env.BYPASS_AUTH === "true"
+        ? { valid: true, userId: "bypass-user", tier: "omega" }
+        : await validateApiKeyAndQuota(rawKey);
+    } catch (authErr) {
+      return res.status(500).json({ error: { message: "Auth service unavailable" } });
+    }
+    if (!authResult?.valid) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
 
     const routingProfile = classifyTask(prompt);
     const isStream = req.body?.stream === true;
 
-    // --- 3. Non-Stream Path ---
+    const estimatedHold = 1000;
+    let actualCost = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let modelUsed = routingProfile.tier;
+
+    if (process.env.BYPASS_AUTH !== "true") {
+      const holdResult = await holdQuota(authResult.userId, estimatedHold, traceId);
+      if (!holdResult.success) {
+        return res.status(429).json({ error: { message: "Insufficient quota" } });
+      }
+    }
+
     if (!isStream) {
       try {
         const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
@@ -391,12 +413,10 @@ app.post("/v1/chat/completions", async (req, res) => {
           usage: result.metadata || {}
         });
       } catch (execErr) {
-        console.error("[" + traceId + "] EXEC_ERR:", execErr.message);
         return res.status(500).json({ error: { message: "Processing failed" } });
       }
     }
 
-    // --- 4. Stream Initialization ---
     res.status(200);
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -408,134 +428,98 @@ app.post("/v1/chat/completions", async (req, res) => {
     let heartbeatInterval = null;
     let timeoutId = null;
     let streamEnded = false;
+    let quotaSettled = false;
 
-    // --- 5. Idempotent Cleanup (Strictly Response-Based) ---
+    async function settleQuotaSafe() {
+      if (quotaSettled) return;
+      quotaSettled = true;
+      if (process.env.BYPASS_AUTH === "true" || !authResult?.userId) return;
+      try {
+        await settleQuota(authResult.userId, estimatedHold, actualCost, traceId);
+      } catch (e) {
+        console.error("[" + traceId + "] SETTLE_ERR:", e.message);
+        quotaSettled = false;
+      }
+    }
+
     async function cleanup(reason) {
       if (streamEnded) return;
       streamEnded = true;
-
       if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
-      
-      // Abort Groq fetch if client truly disconnected or stream finished
       try { abortController.abort(); } catch (_) {}
-
+      await settleQuotaSafe();
       if (!res.writableEnded && !res.destroyed) {
         try {
-          res.write("data: " + JSON.stringify({
-            id: "chatcmpl-end",
-            choices: [{ delta: {}, finish_reason: "stop" }]
-          }) + "\n\n");
+          res.write("data: " + JSON.stringify({ id: "chatcmpl-end", choices: [{ delta: {}, finish_reason: "stop" }] }) + "\n\n");
           res.write("data: [DONE]\n\n");
         } catch (_) {}
         res.end();
       }
-
-      const latency = Date.now() - startTime;
-      console.log("[" + traceId + "] CLOSED: reason=" + reason + ", dur=" + latency + "ms");
+      console.log("[" + traceId + "] CLOSED: reason=" + reason + ", dur=" + (Date.now() - startTime) + "ms");
     }
 
-    // CRITICAL FIX: Only listen to 'res' events.
-    // 'req' closes after Body parsing in POST, causing false aborts.
     res.on("error", () => cleanup("res_error"));
-    res.on("close", () => { 
-      if (!streamEnded && !res.writableEnded) cleanup("client_disconnect"); 
-    });
+    res.on("close", () => { if (!streamEnded && !res.writableEnded) cleanup("client_disconnect"); });
 
-    // --- 6. Hard Timeout (120s) ---
-    timeoutId = setTimeout(() => {
-      if (!streamEnded) cleanup("request_timeout");
-    }, 120000);
+    timeoutId = setTimeout(() => { if (!streamEnded) cleanup("request_timeout"); }, 120000);
 
-    // --- 7. Heartbeat ---
     heartbeatInterval = setInterval(() => {
-      if (streamEnded || res.writableEnded || res.destroyed) {
-        clearInterval(heartbeatInterval);
-        return;
-      }
-      try {
-        res.write(": heartbeat\n\n");
-      } catch (e) {
-        if (!streamEnded) cleanup("heartbeat_fail");
-      }
+      if (streamEnded || res.writableEnded || res.destroyed) { clearInterval(heartbeatInterval); return; }
+      try { res.write(": heartbeat\n\n"); } catch (e) { if (!streamEnded) cleanup("heartbeat_fail"); }
     }, 15000);
 
-    // --- 8. Stream Execution ---
     try {
-      const stream = sovereignProtocol.executeStream(
-        prompt,
-        routingProfile.tier,
-        authResult.userId,
-        abortController.signal
-      );
-
+      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal);
       for await (const event of stream) {
         if (streamEnded || res.writableEnded || res.destroyed) break;
-
         if (event.type === "chunk") {
           let sanitized;
-          try {
-            sanitized = sanitizeOutput(String(event.content ?? ""));
-          } catch (sanErr) {
-            sanitized = "";
-          }
-
+          try { sanitized = sanitizeOutput(String(event.content ?? "")); } catch (sanErr) { sanitized = ""; }
           const ssePayload = {
             id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
             object: "chat.completion.chunk",
             created: Math.floor(Date.now() / 1000),
-            model: routingProfile.tier,
+            model: modelUsed,
             choices: [{ index: 0, delta: { content: sanitized }, finish_reason: null }]
           };
-
           const payload = "data: " + JSON.stringify(ssePayload) + "\n\n";
-          
-          // Backpressure handling
           const canWrite = res.write(payload);
-          if (!canWrite && !streamEnded) {
-            await new Promise(resolve => res.once("drain", resolve));
-          }
-
+          if (!canWrite && !streamEnded) { await new Promise(resolve => res.once("drain", resolve)); }
         } else if (event.type === "metadata") {
-          // Metadata handled silently for billing
+          actualCost = event.totalCost || 0;
+          inputTokens = event.inputTokens || 0;
+          outputTokens = event.outputTokens || 0;
+          modelUsed = event.model || modelUsed;
         } else if (event.type === "error") {
-          try {
-            res.write("data: " + JSON.stringify({
-              error: { message: "Stream processing error" }
-            }) + "\n\n");
-          } catch (_) {}
+          if (event.metadata) {
+            actualCost = event.metadata.totalCost || 0;
+            inputTokens = event.metadata.inputTokens || 0;
+            outputTokens = event.metadata.outputTokens || 0;
+          }
+          try { res.write("data: " + JSON.stringify({ error: { message: "Stream processing error" } }) + "\n\n"); } catch (_) {}
         }
       }
-
-      if (!streamEnded) {
-        await cleanup("normal_completion");
-      }
-
+      if (!streamEnded) { await cleanup("normal_completion"); }
     } catch (streamErr) {
-      console.error("[" + traceId + "] STREAM_ERR:", streamErr.message);
       if (!streamEnded) {
-        try {
-          res.write("data: " + JSON.stringify({
-            error: { message: "Stream interrupted" }
-          }) + "\n\n");
-        } catch (_) {}
+        try { res.write("data: " + JSON.stringify({ error: { message: "Stream interrupted" } }) + "\n\n"); } catch (_) {}
         await cleanup("stream_error");
       }
     }
-
   } catch (err) {
     console.error("[" + traceId + "] FATAL:", err.message);
-    if (!res.headersSent) {
-      return res.status(500).json({ error: { message: "Internal error" } });
-    } else if (!res.writableEnded) {
-      res.end();
-    }
+    if (!res.headersSent) { return res.status(500).json({ error: { message: "Internal error" } }); }
+    else if (!res.writableEnded) { res.end(); }
   }
 });
 
 app.get('/api/sovereign/rate-limiter/status', function(req, res) {
   res.json(getRateLimiterStatus());
 });
+
+app.get('/api/sovereign/command-center', (req, res) => { res.json(sovereignCommandCenter.getFullReport()); });
+app.get('/api/sovereign/audit/verify', (req, res) => { res.json(sovereignCommandCenter.verifyChainIntegrity()); });
 
 app.use(function(req, res, next) {
   var start = Date.now();
@@ -696,6 +680,19 @@ app.use(function(err, req, res, next) {
   console.error('[UNCAUGHT]', err.message);
   res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
 });
+
+/* ===== SOVEREIGN SHUTDOWN ===== */
+let isShuttingDown = false;
+async function handleShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log("[SHUTDOWN] " + signal + " received.");
+  try { await gracefulCronShutdown(10000); } catch(e) {}
+  try { destroyRateLimiter(); } catch(e) {}
+  process.exit(0);
+}
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
 
 app.listen(PORT, function() {
   console.log('TRUNKIA Phase7 on :' + PORT);

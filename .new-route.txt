@@ -1,0 +1,158 @@
+app.post("/v1/chat/completions", async (req, res) => {
+  const traceId = crypto.randomUUID();
+  const startTime = Date.now();
+
+  if (!req.is("application/json")) {
+    return res.status(415).json({ error: { message: "Unsupported Media Type" } });
+  }
+  const prompt = req.body?.messages?.slice(-1)[0]?.content || "";
+  if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
+    return res.status(400).json({ error: { message: "Invalid prompt" } });
+  }
+  if (prompt.length > 32000) {
+    return res.status(413).json({ error: { message: "Prompt too large" } });
+  }
+
+  try {
+    let authResult;
+    try {
+      const rawKey = req.headers.authorization?.replace(/^Bearer\s+/i, "") || "";
+      authResult = process.env.BYPASS_AUTH === "true"
+        ? { valid: true, userId: "bypass-user", tier: "omega" }
+        : await validateApiKeyAndQuota(rawKey);
+    } catch (authErr) {
+      return res.status(500).json({ error: { message: "Auth service unavailable" } });
+    }
+    if (!authResult?.valid) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const routingProfile = classifyTask(prompt);
+    const isStream = req.body?.stream === true;
+
+    const estimatedHold = 1000;
+    let actualCost = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let modelUsed = routingProfile.tier;
+
+    if (process.env.BYPASS_AUTH !== "true") {
+      const holdResult = await holdQuota(authResult.userId, estimatedHold, traceId);
+      if (!holdResult.success) {
+        return res.status(429).json({ error: { message: "Insufficient quota" } });
+      }
+    }
+
+    if (!isStream) {
+      try {
+        const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId);
+        const safeContent = sanitizeOutput(result.content || "");
+        return res.json({
+          id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
+          object: "chat.completion",
+          created: Math.floor(Date.now() / 1000),
+          model: routingProfile.tier,
+          choices: [{ index: 0, message: { role: "assistant", content: safeContent }, finish_reason: "stop" }],
+          usage: result.metadata || {}
+        });
+      } catch (execErr) {
+        return res.status(500).json({ error: { message: "Processing failed" } });
+      }
+    }
+
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (res.flushHeaders) res.flushHeaders();
+
+    const abortController = new AbortController();
+    let heartbeatInterval = null;
+    let timeoutId = null;
+    let streamEnded = false;
+    let quotaSettled = false;
+
+    async function settleQuotaSafe() {
+      if (quotaSettled) return;
+      quotaSettled = true;
+      if (process.env.BYPASS_AUTH === "true" || !authResult?.userId) return;
+      try {
+        await settleQuota(authResult.userId, estimatedHold, actualCost, traceId);
+      } catch (e) {
+        console.error("[" + traceId + "] SETTLE_ERR:", e.message);
+        quotaSettled = false;
+      }
+    }
+
+    async function cleanup(reason) {
+      if (streamEnded) return;
+      streamEnded = true;
+      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+      try { abortController.abort(); } catch (_) {}
+      await settleQuotaSafe();
+      if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.write("data: " + JSON.stringify({ id: "chatcmpl-end", choices: [{ delta: {}, finish_reason: "stop" }] }) + "\n\n");
+          res.write("data: [DONE]\n\n");
+        } catch (_) {}
+        res.end();
+      }
+      console.log("[" + traceId + "] CLOSED: reason=" + reason + ", dur=" + (Date.now() - startTime) + "ms");
+    }
+
+    res.on("error", () => cleanup("res_error"));
+    res.on("close", () => { if (!streamEnded && !res.writableEnded) cleanup("client_disconnect"); });
+
+    timeoutId = setTimeout(() => { if (!streamEnded) cleanup("request_timeout"); }, 120000);
+
+    heartbeatInterval = setInterval(() => {
+      if (streamEnded || res.writableEnded || res.destroyed) { clearInterval(heartbeatInterval); return; }
+      try { res.write(": heartbeat\n\n"); } catch (e) { if (!streamEnded) cleanup("heartbeat_fail"); }
+    }, 15000);
+
+    try {
+      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal);
+      for await (const event of stream) {
+        if (streamEnded || res.writableEnded || res.destroyed) break;
+        if (event.type === "chunk") {
+          let sanitized;
+          try { sanitized = sanitizeOutput(String(event.content ?? "")); } catch (sanErr) { sanitized = ""; }
+          const ssePayload = {
+            id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
+            object: "chat.completion.chunk",
+            created: Math.floor(Date.now() / 1000),
+            model: modelUsed,
+            choices: [{ index: 0, delta: { content: sanitized }, finish_reason: null }]
+          };
+          const payload = "data: " + JSON.stringify(ssePayload) + "\n\n";
+          const canWrite = res.write(payload);
+          if (!canWrite && !streamEnded) { await new Promise(resolve => res.once("drain", resolve)); }
+        } else if (event.type === "metadata") {
+          actualCost = event.totalCost || 0;
+          inputTokens = event.inputTokens || 0;
+          outputTokens = event.outputTokens || 0;
+          modelUsed = event.model || modelUsed;
+        } else if (event.type === "error") {
+          if (event.metadata) {
+            actualCost = event.metadata.totalCost || 0;
+            inputTokens = event.metadata.inputTokens || 0;
+            outputTokens = event.metadata.outputTokens || 0;
+          }
+          try { res.write("data: " + JSON.stringify({ error: { message: "Stream processing error" } }) + "\n\n"); } catch (_) {}
+        }
+      }
+      if (!streamEnded) { await cleanup("normal_completion"); }
+    } catch (streamErr) {
+      if (!streamEnded) {
+        try { res.write("data: " + JSON.stringify({ error: { message: "Stream interrupted" } }) + "\n\n"); } catch (_) {}
+        await cleanup("stream_error");
+      }
+    }
+  } catch (err) {
+    console.error("[" + traceId + "] FATAL:", err.message);
+    if (!res.headersSent) { return res.status(500).json({ error: { message: "Internal error" } }); }
+    else if (!res.writableEnded) { res.end(); }
+  }
+});
