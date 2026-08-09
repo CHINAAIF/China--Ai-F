@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import crypto from 'crypto';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { safeIdentifier } from '../lib/services/db-safety.js';
 dotenv.config();
 
 const LOG_FILE = './isolation.log';
@@ -57,7 +58,7 @@ async function main() {
 
     // 3. إنشاء الدور الجديد
     try {
-        await adminPool.query(`CREATE ROLE ${ROLE_NAME} WITH LOGIN PASSWORD '${ROLE_PASSWORD}'`);
+        await adminPool.query(`CREATE ROLE ${safeIdentifier(ROLE_NAME)} WITH LOGIN PASSWORD '${String(ROLE_PASSWORD).replace(/'/g, "''")}'`);
         log(`✅ Role ${ROLE_NAME} created`);
     } catch (e) {
         if (e.message.includes('already exists')) {
@@ -120,7 +121,7 @@ async function main() {
     } catch (e) {
         log(`❌ Test failed: ${e.message}`);
         log('⚠️ Rolling back...');
-        await adminPool.query(`DROP ROLE IF EXISTS ${ROLE_NAME}`);
+        await adminPool.query(`DROP ROLE IF EXISTS ${safeIdentifier(ROLE_NAME)}`);
         log('✅ Role dropped. Check logs and retry.');
         await adminPool.end();
         process.exit(1);

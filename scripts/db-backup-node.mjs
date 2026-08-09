@@ -2,6 +2,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { safeIdentifier } from '../lib/services/db-safety.js';
 dotenv.config();
 
 const BACKUP_DIR = './db-backups';
@@ -21,7 +22,7 @@ try {
     const backup = {};
     for (const row of tables.rows) {
         const tableName = row.table_name;
-        const data = await pool.query(`SELECT * FROM ${tableName}`);
+        const data = await pool.query(`SELECT * FROM ${safeIdentifier(tableName)}`);
         backup[tableName] = data.rows;
     }
     

@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { safeIdentifier } from '../lib/services/db-safety.js';
 
 // ── ضمان وجود المجلدات قبل أي شيء ──────────────────────────────
 const dirs = ['scripts','agents/sovereign','agents/utils','agents/governance'];
@@ -101,7 +102,7 @@ async function migrate() {
           try { await client.query(idx); } catch(_) {}
         }
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) throw new Error('اسم جدول غير صالح: ' + t.name);
-        const { rows: verify } = await client.query(`SELECT COUNT(*) FROM ${t.name}`);
+        const { rows: verify } = await client.query(`SELECT COUNT(*) FROM ${safeIdentifier(t.name)}`);
         console.log(`✅ ${t.name} created — rows: ${verify[0].count}`);
       } catch(e) {
         console.error(`❌ ${t.name}: ${e.message}`);

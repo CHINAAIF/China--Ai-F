@@ -12,6 +12,7 @@
  */
 
 import pg from 'pg';
+import { safeIdentifier } from '../lib/services/db-safety.js';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -60,7 +61,7 @@ async function verifyAppendOnly() {
 
       // 2. Test UPDATE
       try {
-        await pool.query(`UPDATE ${table} SET id = id WHERE id = -999999999;`);
+        await pool.query(`UPDATE ${safeIdentifier(table)} SET id = id WHERE id = -999999999;`);
         updateBlocked = false;
       } catch (e) {
         updateBlocked = true;
@@ -68,7 +69,7 @@ async function verifyAppendOnly() {
 
       // 3. Test DELETE
       try {
-        await pool.query(`DELETE FROM ${table} WHERE id = -999999999;`);
+        await pool.query(`DELETE FROM ${safeIdentifier(table)} WHERE id = -999999999;`);
         deleteBlocked = false;
       } catch (e) {
         deleteBlocked = true;

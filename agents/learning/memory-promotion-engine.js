@@ -3,6 +3,7 @@ import dotenv from 'dotenv'; import { pool } from './db-learning.js';
 import crypto from 'crypto';
 import { safeGroqJSON } from '../../lib/services/safe-json.js';
 import { pingHeartbeat } from '../../lib/services/heartbeat.js';
+import { safeIdentifier } from '../../lib/services/db-safety.js';
 
 const HMAC_SECRET = process.env.ENCRYPTION_KEY;
 
@@ -142,7 +143,7 @@ class MemoryPromotionEngine {
   // ── كشف التعارضات وتسجيلها ──────────────────────────────────────
   async detectConflicts(newHash, domain, existingTable) {
     try {
-      const existing = await pool.query(`SELECT content_hash FROM ${existingTable} WHERE domain=$1 LIMIT 5`, [domain]);
+      const existing = await pool.query(`SELECT content_hash FROM ${safeIdentifier(existingTable)} WHERE domain=$1 LIMIT 5`, [domain]);
       for(const row of existing.rows) {
         if(row.content_hash !== newHash) {
           await pool.query(`
