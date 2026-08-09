@@ -45,6 +45,8 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import cluster from 'cluster';
+import os from 'os';
 import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
 import { rateLimitMiddleware, getRateLimiterStatus, setRateLimiterPool, destroyRateLimiter } from './lib/services/sovereign-rate-limiter.js';
 import { sovereignCommandCenter } from './lib/services/sovereign-command-center.js';
@@ -627,33 +629,52 @@ function setupCron(cl) {
   } catch (e) { console.error('[CRON ERR]', e.message); }
 }
 
-/* ===== START ===== */
-app.get('/tap', (req, res) => { console.log('[TRUTH TAP] Hit!'); res.send('TAP_OK'); });
-
-
-app.use(function(err, req, res, next) {
-  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'Forbidden', request_id: req._requestId });
-  console.error('[UNCAUGHT]', err.message);
-  res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
-});
-
-/* ===== SOVEREIGN SHUTDOWN ===== */
-let isShuttingDown = false;
-async function handleShutdown(signal) {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  console.log("[SHUTDOWN] " + signal + " received.");
-  try { await gracefulCronShutdown(10000); } catch(e) {}
-  try { destroyRateLimiter(); } catch(e) {}
-  process.exit(0);
+/* ===== SOVEREIGN CLUSTER MODE (Enterprise Scaling) ===== */
+if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
+  // MASTER PROCESS: Manages workers and runs background jobs exclusively
+  const numCPUs = os.cpus().length;
+  console.log('[SOVEREIGN CLUSTER] Master process starting ' + numCPUs + ' workers...');
+  
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+  
+  cluster.on('exit', (worker, code, signal) => {
+    console.warn('[SOVEREIGN CLUSTER] Worker ' + worker.process.pid + ' died. Restarting...');
+    cluster.fork();
+  });
+  
+  // Master runs background sync and cron
+  (async () => {
+    try { 
+      var r = await syncAgentsToDb(); 
+      console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); 
+    } catch (e) { console.error('[SYNC ERR]', e.message); }
+    
+    try { 
+      var cm = await import('node-cron'); 
+      setupCron(cm.default || cm); 
+      console.log('[SOVEREIGN CLUSTER] Master background jobs initialized.');
+    } catch (e) { console.log('[WARN] node-cron not available'); }
+  })();
+  
+} else {
+  // WORKER PROCESS (or Standalone in Staging): Handles HTTP traffic only
+  app.listen(PORT, async function() {
+    console.log('[TRUNKIA] Worker ' + process.pid + ' listening on :' + PORT);
+    
+    // In staging (single thread), we still run crons here for testing
+    if (process.env.NODE_ENV !== 'production') {
+      try { 
+        var r = await syncAgentsToDb(); 
+        console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total'); 
+      } catch (e) { console.error('[SYNC ERR]', e.message); }
+      
+      try { 
+        var cm = await import('node-cron'); 
+        setupCron(cm.default || cm); 
+      } catch (e) { console.log('[WARN] node-cron not available'); }
+    }
+  });
 }
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('SIGINT', () => handleShutdown('SIGINT'));
-
-app.listen(PORT, function() {
-  console.log('TRUNKIA Phase7 on :' + PORT);
-  // Fire-and-forget background sync to prevent Event Loop blocking
-  syncAgentsToDb().then(r => console.log('Sync: ' + r.inserted + ' new, ' + r.updated + ' updated, ' + r.total_files + ' total')).catch(e => console.error('[SYNC ERR]', e.message));
-  import('node-cron').then(cm => setupCron(cm.default || cm)).catch(e => console.log('[WARN] node-cron not available'));
-});
 
