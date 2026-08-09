@@ -2,7 +2,7 @@ import logger from './lib/services/sovereign-logger.js';
 import cluster from 'cluster';
 
 import './config/env.js';
-import { holdQuota, settleQuota } from './lib/services/quota-manager.js';
+import { createQuotaContext } from './lib/services/quota-manager.js';
 import { sovereignProtocol } from './lib/sovereign-protocol.js';
 import { adminGuard } from './lib/admin-guard.js';
 import { faultDetectorAgent } from './agents/system/fault-detector-agent.js';
@@ -382,12 +382,12 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     const routingProfile = classifyTask(prompt);
     const isStream = req.body?.stream === true;
-    const estimatedHold = 1000;
-    let actualCost = 0, inputTokens = 0, outputTokens = 0, modelUsed = routingProfile.tier, tribunalData = null;
-
+    
+    // === QUOTA CONTEXT INITIALIZATION ===
+    const quotaCtx = createQuotaContext(authResult.userId, traceId);
     if (process.env.BYPASS_AUTH !== "true") {
-      const holdResult = await holdQuota(authResult.userId, estimatedHold, traceId);
-      if (!holdResult.success) return res.status(429).json({ error: { message: "Insufficient quota" } });
+      const quotaOk = await quotaCtx.hold(50); // Initial hold 50 tokens
+      if (!quotaOk) return res.status(429).json({ error: { message: "Insufficient quota" } });
     }
 
     if (!isStream) {
@@ -414,20 +414,13 @@ app.post("/v1/chat/completions", async (req, res) => {
     if (res.flushHeaders) res.flushHeaders();
 
     const abortController = new AbortController();
-    let heartbeatInterval = null, timeoutId = null, streamEnded = false, quotaSettled = false;
-
-    async function settleQuotaSafe() {
-      if (quotaSettled) return; quotaSettled = true;
-      if (process.env.BYPASS_AUTH === "true" || !authResult?.userId) return;
-      try { await settleQuota(authResult.userId, estimatedHold, actualCost, traceId); } catch (e) { quotaSettled = false; }
-    }
+    let heartbeatInterval = null, timeoutId = null, streamEnded = false, tribunalData = null;
 
     async function cleanup(reason) {
       if (streamEnded) return; streamEnded = true;
       if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
       try { abortController.abort(); } catch (_) {}
-      await settleQuotaSafe();
       if (!res.writableEnded && !res.destroyed) {
         try {
           if (tribunalData) {
@@ -454,18 +447,14 @@ app.post("/v1/chat/completions", async (req, res) => {
         if (event.type === "chunk") {
           let sanitized;
           try { sanitized = sanitizeOutput(String(event.content ?? "")); } catch (sanErr) { sanitized = ""; }
-          const ssePayload = { id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"), object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelUsed, choices: [{ index: 0, delta: { content: sanitized }, finish_reason: null }] };
+          const ssePayload = { id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"), object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: routingProfile.tier, choices: [{ index: 0, delta: { content: sanitized }, finish_reason: null }] };
           const payload = "data: " + JSON.stringify(ssePayload) + "\n\n";
           const canWrite = res.write(payload);
           if (!canWrite && !streamEnded) { await new Promise(resolve => res.once("drain", resolve)); }
         } else if (event.type === "metadata") {
-          actualCost = event.totalCost || 0;
-          inputTokens = event.inputTokens || 0;
-          outputTokens = event.outputTokens || 0;
-          modelUsed = event.model || modelUsed;
-          tribunalData = event.tribunal || null;
+          if (event.tribunal) tribunalData = event.tribunal;
         } else if (event.type === "error") {
-          if (event.metadata) { actualCost = event.metadata.totalCost || 0; tribunalData = event.metadata.tribunal || null; }
+          if (event.metadata?.tribunal) tribunalData = event.metadata.tribunal;
           try { res.write("data: " + JSON.stringify({ error: { message: "Stream processing error" } }) + "\n\n"); } catch (_) {}
         }
       }
