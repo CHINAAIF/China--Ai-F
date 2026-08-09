@@ -38,3 +38,4 @@ db-backups/
 *.sql.gz
 backups/
 backup/
+.env.docker
