@@ -3,6 +3,7 @@ import cluster from 'cluster';
 
 import './config/env.js';
 import { createQuotaContext } from './lib/services/quota-manager.js';
+import { sovereignKeys } from './lib/services/key-manager.js';
 import { sovereignProtocol } from './lib/sovereign-protocol.js';
 import { adminGuard } from './lib/admin-guard.js';
 import { faultDetectorAgent } from './agents/system/fault-detector-agent.js';
@@ -412,7 +413,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     if (res.flushHeaders) res.flushHeaders();
 
     const abortController = new AbortController();
-    let heartbeatInterval = null, timeoutId = null, streamEnded = false, tribunalData = null, contentFilterTriggered = false, signature = null;
+    let heartbeatInterval = null, timeoutId = null, streamEnded = false, tribunalData = null, contentFilterTriggered = false, cryptoProof = null;
 
     async function cleanup(reason) {
       if (streamEnded) return; streamEnded = true;
@@ -423,8 +424,11 @@ app.post("/v1/chat/completions", async (req, res) => {
         try {
           if (contentFilterTriggered) {
             res.write("data: " + JSON.stringify({ id: "chatcmpl-filter", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "content_filter" }] }) + "\n\n");
-          } else if (tribunalData) {
-            res.write("data: " + JSON.stringify({ id: "chatcmpl-meta", object: "chat.completion.chunk", choices: [{ delta: {}, finish_reason: "stop" }], tribunal: tribunalData, signature: signature }) + "\n\n");
+          } else if (tribunalData || cryptoProof) {
+            const metaPayload = { id: "chatcmpl-meta", object: "chat.completion.chunk", choices: [{ delta: {}, finish_reason: "stop" }] };
+            if (tribunalData) metaPayload.tribunal = tribunalData;
+            if (cryptoProof) metaPayload.cryptoProof = cryptoProof;
+            res.write("data: " + JSON.stringify(metaPayload) + "\n\n");
           }
           res.write("data: [DONE]\n\n");
         } catch (_) {}
@@ -441,7 +445,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     }, 15000);
 
     try {
-      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal, quotaCtx);
+      const stream = sovereignProtocol.executeStream(prompt, routingProfile.tier, authResult.userId, abortController.signal, quotaCtx, traceId);
       for await (const event of stream) {
         if (streamEnded || res.writableEnded || res.destroyed) break;
         if (event.type === "chunk") {
@@ -454,11 +458,11 @@ app.post("/v1/chat/completions", async (req, res) => {
         } else if (event.type === "metadata") {
           if (event.tribunal) tribunalData = event.tribunal;
           if (event.contentFilterTriggered) contentFilterTriggered = true;
-          if (event.signature) signature = event.signature;
+          if (event.cryptoProof) cryptoProof = event.cryptoProof;
         } else if (event.type === "error") {
           if (event.metadata?.tribunal) tribunalData = event.metadata.tribunal;
           if (event.metadata?.contentFilterTriggered) contentFilterTriggered = true;
-          if (event.metadata?.signature) signature = event.metadata.signature;
+          if (event.metadata?.cryptoProof) cryptoProof = event.metadata.cryptoProof;
           try { res.write("data: " + JSON.stringify({ error: { message: "Stream processing error" } }) + "\n\n"); } catch (_) {}
         }
       }
@@ -477,6 +481,12 @@ app.get('/api/sovereign/rate-limiter/status', function(req, res) {
 
 app.get('/api/sovereign/command-center', (req, res) => { res.json(sovereignCommandCenter.getFullReport()); });
 app.get('/api/sovereign/audit/verify', (req, res) => { res.json(sovereignCommandCenter.verifyChainIntegrity()); });
+
+
+// === SOVEREIGN KEY DISCOVERY API ===
+app.get('/api/sovereign/keys', (req, res) => {
+  res.json({ keys: sovereignKeys.getPublicKeys() });
+});
 
 app.use(function(req, res, next) {
   var start = Date.now();
