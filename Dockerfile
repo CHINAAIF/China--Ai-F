@@ -1,23 +1,28 @@
-# Stage 1: Build
-FROM node:22-alpine AS builder
+# TRUNKIA Sovereign Dockerfile v1.0
+FROM node:20-alpine
+
+# Install tini for proper signal handling (Zombie process prevention)
+RUN apk add --no-cache tini wget
+
 WORKDIR /app
+
+# Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Copy application code
 COPY . .
 
-# Stage 2: Production
-FROM node:22-alpine
-WORKDIR /app
-# نسخ الملفات من مرحلة البناء
-COPY --from=builder /app ./
-# إنشاء مستخدم عادي وتغيير الملكية (الأمان السيبراني: لا تعمل بصلاحيات root أبداً)
-RUN chown -R node:node /app
+# Switch to non-root user for security
 USER node
 
-ENV NODE_ENV=production
-EXPOSE 8080
+# Expose API port
+EXPOSE 9090
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1
+# Healthcheck (Polls /ping every 30s)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:9090/ping || exit 1
 
+# Use tini as entrypoint
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "index.js"]
