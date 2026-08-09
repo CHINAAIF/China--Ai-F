@@ -392,8 +392,9 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     if (!isStream) {
       try {
-        const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId, quotaCtx);
+        const result = await sovereignProtocol.execute(prompt, routingProfile.tier, authResult.userId, quotaCtx, traceId);
         const safeContent = sanitizeOutput(result.content || "");
+        console.log("[DEBUG] Non-Stream attestation keys:", Object.keys(result.attestation || {}));
         return res.json({
           id: "chatcmpl-" + crypto.randomBytes(12).toString("hex"),
           object: "chat.completion",
@@ -402,7 +403,10 @@ app.post("/v1/chat/completions", async (req, res) => {
           choices: [{ index: 0, message: { role: "assistant", content: safeContent }, finish_reason: "stop" }],
           attestation: result.attestation || {}
         });
-      } catch (execErr) { return res.status(500).json({ error: { message: "Processing failed" } }); }
+      } catch (execErr) {
+            console.error("[NON-STREAM FATAL]", execErr.stack);
+            return res.status(500).json({ error: { message: execErr.message } });
+          }
     }
 
     res.status(200);
