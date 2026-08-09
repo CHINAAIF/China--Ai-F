@@ -544,11 +544,7 @@ app.use(function(req, res, next) {
   res.end = function(chunk, enc) { res.setHeader('x-response-time', (Date.now() - start) + 'ms'); origEnd.call(res, chunk, enc); };
   next();
 });
-app.use(function(err, req, res, next) {
-  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'Forbidden', request_id: req._requestId });
-  console.error('[UNCAUGHT]', err.message);
-  res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
-});
+
 
 /* ===== SYSTEM ===== */
 app.get('/health', function(req, res) { res.json({ status: circuit.state === 'OPEN' ? 'degraded' : 'ok', port: PORT, phase: 7, uptime: fmt(Math.floor((Date.now() - START_TIME) / 1000)), circuit: circuit.state, endpoints: 21, requests_served: requestCounter, time: new Date().toISOString() }); });
@@ -698,6 +694,12 @@ function setupCron(cl) {
 /* ===== START ===== */
 app.get('/tap', (req, res) => { console.log('[TRUTH TAP] Hit!'); res.send('TAP_OK'); });
 
+
+app.use(function(err, req, res, next) {
+  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'Forbidden', request_id: req._requestId });
+  console.error('[UNCAUGHT]', err.message);
+  res.status(500).json({ error: 'Internal error', request_id: req._requestId || 'unknown' });
+});
 
 app.listen(PORT, function() {
   console.log('TRUNKIA Phase7 on :' + PORT);
