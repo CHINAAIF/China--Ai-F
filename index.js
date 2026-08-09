@@ -1,3 +1,6 @@
+import logger from './lib/services/sovereign-logger.js';
+import cluster from 'cluster';
+
 import './config/env.js';
 import { holdQuota, settleQuota } from './lib/services/quota-manager.js';
 import { sovereignProtocol } from './lib/sovereign-protocol.js';
@@ -10,7 +13,7 @@ import { dlpAgent } from './agents/system/dlp-agent.js';
 import { addInferenceJob, getJobStatus } from './lib/job-queue.js';
 import * as Sentry from '@sentry/node';
 
-interceptStdout(); // Stream-level interceptor (must be first)
+
 if (process.env.SENTRY_DSN) {
   Sentry.init({ 
     dsn: process.env.SENTRY_DSN, 
@@ -46,7 +49,7 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import logger, { interceptStdout } from './lib/services/sovereign-logger.js';import cluster from 'cluster';
+
 import os from 'os';
 import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
 import { rateLimitMiddleware, getRateLimiterStatus, setRateLimiterPool, destroyRateLimiter } from './lib/services/sovereign-rate-limiter.js';
@@ -146,6 +149,7 @@ app.use('/api/scheduler/trigger/', strictLimiter);
 /* ===== SECURITY: Body Size ===== */
 app.use(express.json({ limit: '100kb' }));
 app.use(logger.middleware());
+
 app.use(rateLimitMiddleware());
 app.use(scraperGuard);
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
@@ -679,4 +683,3 @@ if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
     }
   });
 }
-
