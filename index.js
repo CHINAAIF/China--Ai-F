@@ -45,6 +45,7 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
 dotenv.config();
 
 var app = express();
@@ -79,7 +80,6 @@ var __dirname = path.dirname(__filename);
 var START_TIME = Date.now();
 var LAST_SYNC = null;
 var cronJobs = {};
-var cronStats = {};
 var requestCounter = 0;
 
 /* ===== SECURITY: Helmet ===== */
@@ -565,10 +565,10 @@ app.get('/api/agents/stats', async function(req, res) { try { var r = await safe
 
 /* ===== SUPERVISOR ===== */
 app.get('/api/supervisor/diagnostic', adminGuard, async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); res.json({ health_score: sc, health_grade: grade(sc), circuit: { state: circuit.state, failures: circuit.failures }, checks: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL, passed: dbL < 500 }, agents: { filesystem: files.length, database: parseInt(d.total, 10), synced: parseInt(d.total, 10) >= files.length, passed: parseInt(d.total, 10) >= files.length }, memory: { used_mb: usedMb, percent: Math.round((usedMb / 512) * 100), passed: usedMb < 460 }, faults: { count: parseInt(d.faulted, 10), passed: parseInt(d.faulted, 10) === 0 }, circuit: { state: circuit.state, passed: circuit.state === 'CLOSED' } }, security: { helmet: true, rate_limit: '120/min global, 20/min strict', cors: 'enabled', body_limit: '100kb' }, timestamp: new Date().toISOString() }); } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
-app.get('/api/supervisor/status', adminGuard, async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); res.json({ db_latency_ms: Date.now() - dbS, db_status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', circuit: circuit, cron_jobs_active: Object.keys(cronJobs).length, cron_stats: cronStats, last_sync: LAST_SYNC, requests_served: requestCounter, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }); } catch (e) { res.json({ db_status: 'error', circuit: circuit, error: e.message }); } });
+app.get('/api/supervisor/status', adminGuard, async function(req, res) { try { var dbS = Date.now(); await safeQuery('SELECT 1'); res.json({ db_latency_ms: Date.now() - dbS, db_status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', circuit: circuit, cron_jobs_active: Object.keys(cronJobs).length, cron_stats: getGuardianStats(), last_sync: LAST_SYNC, requests_served: requestCounter, uptime_seconds: Math.floor((Date.now() - START_TIME) / 1000) }); } catch (e) { res.json({ db_status: 'error', circuit: circuit, error: e.message }); } });
 
 /* ===== SCHEDULER ===== */
-app.get('/api/scheduler/status', adminGuard, function(req, res) { var jobs = []; var k = Object.keys(cronJobs); for (var i = 0; i < k.length; i++) jobs.push({ name: k[i], running: true, last_execution: cronStats[k[i]] || null }); res.json({ active_jobs: jobs.length, jobs: jobs }); });
+app.get('/api/scheduler/status', adminGuard, function(req, res) { var jobs = []; var k = Object.keys(cronJobs); for (var i = 0; i < k.length; i++) jobs.push({ name: k[i], running: true, last_execution: getGuardianStats()[k[i]] || null }); res.json({ active_jobs: jobs.length, jobs: jobs }); });
 app.get('/api/scheduler/trigger/:name', adminGuard, async function(req, res) { try { var n = sanitize(sanitize(req.params.name)); if (n === 'agent-sync') { var r = await syncAgentsToDb(); res.json({ triggered: n, result: r }); } else if (n === 'agent-heartbeat') { var r2 = await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); res.json({ triggered: n, updated: r2.rowCount }); } else if (n === 'self-heal') { var h = await selfHeal(); res.json({ triggered: n, result: h }); } else { res.status(404).json({ error: 'Unknown job', available: ['agent-sync', 'agent-heartbeat', 'self-heal'] }); } } catch (e) { res.status(503).json({ error: e.message, circuit: circuit.state }); } });
 
 /* ===== SYSTEM PULSE ===== */
@@ -577,7 +577,7 @@ app.get('/healthz', function(req, res) {
   res.status(200).json({ status: 'ok', service: 'TRUNKIA', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/system/pulse', adminGuard, async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 7, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: cronStats }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures }, security: { helmet: true, rate_limit_active: true, cors_enabled: true } }, endpoints: 21, requests_served: requestCounter, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
+app.get('/api/system/pulse', adminGuard, async function(req, res) { try { var upSec = Math.floor((Date.now() - START_TIME) / 1000); var dbS = Date.now(); await safeQuery('SELECT 1'); var dbL = Date.now() - dbS; var mem = process.memoryUsage(); var usedMb = Math.round(mem.rss / 1024 / 1024); var files = scanAgentFiles(); var dbA = await safeQuery("SELECT count(*) as total,count(*) FILTER (WHERE status='DEPLOYED') as deployed,count(*) FILTER (WHERE status='FAULT_ISOLATED') as faulted FROM agent_registry"); var d = dbA.rows[0]; var sc = 100; if (dbL > 500) sc -= 25; if (parseInt(d.total, 10) < files.length) sc -= 25; if (usedMb > 460) sc -= 25; if (parseInt(d.faulted, 10) > 0) sc -= 15; if (circuit.state !== 'CLOSED') sc -= 10; sc = Math.max(0, sc); updateCachedHealth({ score: sc, grade: grade(sc) }); res.json({ system: 'TRUNKIA', version: '1.0.0', phase: 7, uptime: fmt(upSec), uptime_seconds: upSec, health_score: sc, health_grade: grade(sc), components: { database: { status: circuit.state === 'OPEN' ? 'circuit_open' : 'connected', latency_ms: dbL }, agents: { total: files.length, deployed: parseInt(d.deployed, 10), faulted: parseInt(d.faulted, 10) }, scheduler: { active_jobs: Object.keys(cronJobs).length, stats: getGuardianStats() }, memory: { used_mb: usedMb, limit_mb: 512, percent: Math.round((usedMb / 512) * 100) }, circuit_breaker: { state: circuit.state, failures: circuit.failures }, security: { helmet: true, rate_limit_active: true, cors_enabled: true } }, endpoints: 21, requests_served: requestCounter, last_sync: LAST_SYNC, timestamp: new Date().toISOString() }); } catch (e) { var fb = cachedHealth || { score: 0, grade: 'F' }; res.status(503).json({ degraded: true, cached_health: fb, error: e.message, circuit: circuit.state, timestamp: new Date().toISOString() }); } });
 app.post('/api/inference', handleSovereignInference);
 app.post('/api/intelligence/strategic-analysis', async (req, res) => {
   try {
@@ -656,24 +656,14 @@ app.use(function(req, res) {
   res.status(404).json({ error: 'Not found', request_id: req._requestId || 'unknown' });
 });
 
-/* ===== CRON MUTEX (Prevents Stampede) ===== */
-const cronLocks = new Map();
-function safeCron(name, fn) {
-  return async function() {
-    if (cronLocks.has(name)) return console.warn('[CRON SKIP] ' + name + ' already running');
-    cronLocks.set(name, true);
-    try { await fn(); } catch (e) { console.error('[CRON ERR] ' + name + ':', e.message); } finally { cronLocks.delete(name); }
-  };
-}
-
-/* ===== CRON ===== */
+/* ===== CRON (Guardian v2.0) ===== */
 function setupCron(cl) {
   if (!cl) return;
   try {
-    cronJobs['agent-heartbeat'] = cl.schedule('*/5 * * * *', safeCron('agent-heartbeat', async function() { try { await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-heartbeat'] = { last: new Date().toISOString(), status: 'error', error: e.message }; } }));
-    cronJobs['agent-sync'] = cl.schedule('0 * * * *', safeCron('agent-sync', async function() { try { var r = await syncAgentsToDb(); cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } }));
-    cronJobs['self-heal'] = cl.schedule('*/15 * * * *', safeCron('self-heal', async function() { try { var r = await selfHeal(); cronStats['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { cronStats['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } }));
-    cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', safeCron('governance-monitor', async function() { try { await runGovernanceMonitor(); cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { cronStats['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } }));
+    cronJobs['agent-heartbeat'] = cl.schedule('*/5 * * * *', safeCron('agent-heartbeat', async function() { try { await safeQuery("UPDATE agent_registry SET last_run=NOW() WHERE status='DEPLOYED'"); getGuardianStats()['agent-heartbeat'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { getGuardianStats()['agent-heartbeat'] = { last: new Date().toISOString(), status: 'error', error: e.message }; } }));
+    cronJobs['agent-sync'] = cl.schedule('0 * * * *', safeCron('agent-sync', async function() { try { var r = await syncAgentsToDb(); getGuardianStats()['agent-sync'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { getGuardianStats()['agent-sync'] = { last: new Date().toISOString(), status: 'error' }; } }));
+    cronJobs['self-heal'] = cl.schedule('*/15 * * * *', safeCron('self-heal', async function() { try { var r = await selfHeal(); getGuardianStats()['self-heal'] = { last: new Date().toISOString(), status: 'ok', healed: r.healed }; } catch (e) { getGuardianStats()['self-heal'] = { last: new Date().toISOString(), status: 'error' }; } }));
+    cronJobs['governance-monitor'] = cl.schedule('0 */6 * * *', safeCron('governance-monitor', async function() { try { await runGovernanceMonitor(); getGuardianStats()['governance-monitor'] = { last: new Date().toISOString(), status: 'ok' }; } catch (e) { getGuardianStats()['governance-monitor'] = { last: new Date().toISOString(), status: 'error' }; } }));
     // Sensory Agents (تعمل كل ساعة)
     cronJobs['arxiv-sentinel'] = cl.schedule('0 * * * *', safeCron('arxiv-sentinel', async function() { try { await arxivSentinelAgent.run('Artificial Intelligence'); } catch (e) { console.error('[ARXIV SENTINEL ERR]', e.message); } }));
     cronJobs['china-news'] = cl.schedule('30 * * * *', safeCron('china-news', async function() { try { await chinaNewsAgent.run(); } catch (e) { console.error('[CHINA NEWS ERR]', e.message); } }));
