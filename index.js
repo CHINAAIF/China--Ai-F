@@ -45,7 +45,7 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import cluster from 'cluster';
+import logger from './lib/services/sovereign-logger.js';import cluster from 'cluster';
 import os from 'os';
 import { safeCron, getGuardianStats, gracefulCronShutdown } from './lib/services/cron-guardian.js';
 import { rateLimitMiddleware, getRateLimiterStatus, setRateLimiterPool, destroyRateLimiter } from './lib/services/sovereign-rate-limiter.js';
@@ -144,6 +144,7 @@ app.use('/api/scheduler/trigger/', strictLimiter);
 
 /* ===== SECURITY: Body Size ===== */
 app.use(express.json({ limit: '100kb' }));
+app.use(logger.middleware());
 app.use(rateLimitMiddleware());
 app.use(scraperGuard);
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
