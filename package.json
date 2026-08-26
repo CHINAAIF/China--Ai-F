@@ -31,7 +31,7 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "vitest": "^4.1.9"
   }
 }
